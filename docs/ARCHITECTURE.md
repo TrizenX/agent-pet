@@ -75,3 +75,19 @@ The byte bound is not redundant. A thousand-entry queue holding 300 KB payloads 
 The guard refuses any request carrying `Origin`, `Sec-Fetch-Site` or `Sec-Fetch-Mode`. Browsers always send at least one; hooks never do. Page script cannot suppress them — they are forbidden header names.
 
 One rule, no configuration, and it closes the whole "any web page can POST to your loopback port" vector. The optional `PET_TOKEN` is hardening on top, not the primary defence.
+
+
+## Running it
+
+```sh
+pnpm install
+pnpm --filter @agent-pet/pet-core dev      # vite + tauri together
+```
+
+A **debug** build loads `devUrl` (the Vite dev server), not `frontendDist`. Running `cargo run` on its own therefore shows an empty window with no error anywhere, because the shell is pointed at a server nobody started — the symptom is indistinguishable from a crashed renderer. Either use `pnpm dev`, or start `pnpm dev:vite` first.
+
+The shell prints the URL it resolved at startup for exactly this reason.
+
+### Seeing inside the webview
+
+A transparent, undecorated overlay has nowhere to show a failure: a broken frontend and a working one both look like an empty screen. `webview_log` bridges `console.*` and unhandled errors to the shell's stdout, installed on `on_page_load` — installing it during `setup` does not work, because `eval` there runs against whatever document exists at that moment and is discarded on navigation.

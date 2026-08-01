@@ -11,7 +11,14 @@ import { join, relative, sep } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const SCAN = join(ROOT, "packages/pet-core/src");
-const ALLOWED = new Set(["adapters/registry.ts"]);
+const ALLOWED = new Set([
+  "adapters/registry.ts",
+  // Proving the registry actually wires an adapter means naming one. Same
+  // category as the registry itself, and deliberately not a blanket exemption
+  // for tests — the rule already caught an agent name in a machine test
+  // comment, which was a real smell.
+  "pipeline.test.ts",
+]);
 
 /** Strings that would mean agent knowledge has leaked out of the adapter. */
 const FORBIDDEN = [
