@@ -48,7 +48,10 @@ fn main() {
         // moment and is discarded on navigation, so the bridge has to be
         // reinstalled per page load or it silently never runs.
         .on_page_load(|win, _| {
-            println!("[webview] page loaded: {}", win.url().map(|u| u.to_string()).unwrap_or_default());
+            println!(
+                "[webview] page loaded: {}",
+                win.url().map(|u| u.to_string()).unwrap_or_default()
+            );
             let _ = win.eval(CONSOLE_BRIDGE);
         })
         .setup(move |app| {
@@ -74,7 +77,10 @@ fn main() {
                 println!("[spike-c] static render mode");
             }
 
-            println!("[setup] window url = {:?}", win.url().map(|u| u.to_string()));
+            println!(
+                "[setup] window url = {:?}",
+                win.url().map(|u| u.to_string())
+            );
             let _ = win.show();
 
             spawn_server(app.handle().clone(), state.clone());
