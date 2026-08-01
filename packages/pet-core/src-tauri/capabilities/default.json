@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "What the pet window is allowed to ask the shell for. Deliberately minimal: it listens for forwarded events and reports its own readiness, and nothing else.",
   "windows": ["pet"],
-  "permissions": ["core:default", "core:event:allow-listen", "core:event:allow-unlisten"]
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "clipboard-manager:allow-write-text"
+  ]
 }

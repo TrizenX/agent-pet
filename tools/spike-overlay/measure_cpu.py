@@ -108,7 +108,11 @@ def rss_kb(pids) -> int:
 
 
 def measure(binary: Path, static: bool, minutes: float, settle: float) -> dict:
-    env = dict(os.environ, PET_STATIC="1" if static else "0")
+    # PET_STATIC was removed once the real renderer landed: `sleeping` is now
+    # reached through the state machine, so the flag would have been a second,
+    # divergent path to the thing being measured. Idle cost is now measured by
+    # leaving the app alone, which is also what a user does.
+    env = dict(os.environ)
     proc = subprocess.Popen(
         [str(binary)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )

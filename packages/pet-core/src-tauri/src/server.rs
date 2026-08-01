@@ -32,7 +32,7 @@ use crate::queue::{EventQueue, RawEvent};
 /// Hard ceiling on a single body.
 ///
 /// Not the 8 KB the spec originally called for — see the note in
-/// `docs/ARCHITECTURE.md`. A `PostToolUse` payload embeds the tool's entire
+/// `docs/ARCHITECTURE.md`. A tool-completion payload embeds the tool's entire
 /// response, so a `Read` of a large file or a chatty command produces payloads
 /// far past 8 KB. Rejecting those would mean returning a non-204 to a genuine
 /// hook, which I1 forbids. This limit only exists to stop something
@@ -223,7 +223,7 @@ mod tests {
     async fn a_hook_event_is_accepted_with_an_empty_204() {
         let st = state();
         let (status, body) =
-            send(router(st.clone()), post("/event/claude-code", r#"{"a":1}"#)).await;
+            send(router(st.clone()), post("/event/some-agent", r#"{"a":1}"#)).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         assert!(body.is_empty(), "I1: the response body must be empty");
         assert_eq!(st.queue.len(), 1);
@@ -251,7 +251,7 @@ mod tests {
         // so this is structurally impossible rather than merely avoided.
         for body in ["not json at all", "", "{", "[1,2,3]", "null"] {
             let st = state();
-            let (status, out) = send(router(st.clone()), post("/event/claude-code", body)).await;
+            let (status, out) = send(router(st.clone()), post("/event/some-agent", body)).await;
             assert_eq!(status, StatusCode::NO_CONTENT, "body={body:?}");
             assert!(out.is_empty());
         }
@@ -262,7 +262,7 @@ mod tests {
         let st = state();
         let req = Request::builder()
             .method("POST")
-            .uri("/event/claude-code")
+            .uri("/event/some-agent")
             .body(Body::from("{}"))
             .unwrap();
         assert_eq!(send(router(st), req).await.0, StatusCode::NO_CONTENT);
@@ -273,7 +273,7 @@ mod tests {
         let st = state();
         let req = Request::builder()
             .method("POST")
-            .uri("/event/claude-code")
+            .uri("/event/some-agent")
             .header("content-type", "application/json")
             .header("origin", "https://evil.example")
             .body(Body::from("{}"))
@@ -287,7 +287,7 @@ mod tests {
     async fn a_token_is_enforced_when_configured() {
         let st = Arc::new(ServerState::new(DEFAULT_PORT, Some("secret".into())));
         assert_eq!(
-            send(router(st.clone()), post("/event/claude-code", "{}"))
+            send(router(st.clone()), post("/event/some-agent", "{}"))
                 .await
                 .0,
             StatusCode::FORBIDDEN
@@ -295,7 +295,7 @@ mod tests {
 
         let req = Request::builder()
             .method("POST")
-            .uri("/event/claude-code")
+            .uri("/event/some-agent")
             .header("x-pet-token", "secret")
             .body(Body::from("{}"))
             .unwrap();
@@ -309,18 +309,18 @@ mod tests {
     async fn a_pathological_body_is_refused_by_the_limit_layer() {
         let st = state();
         let huge = "x".repeat(MAX_BODY_BYTES + 1);
-        let (status, _) = send(router(st.clone()), post("/event/claude-code", &huge)).await;
+        let (status, _) = send(router(st.clone()), post("/event/some-agent", &huge)).await;
         assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
         assert_eq!(st.queue.len(), 0);
     }
 
     #[tokio::test]
     async fn a_large_but_realistic_payload_is_accepted() {
-        // A PostToolUse embeds the tool's whole response; 200 KB is ordinary,
+        // A tool-completion payload embeds the whole response; 200 KB is ordinary,
         // and answering anything but 204 to it would break I1.
         let st = state();
         let big = format!(r#"{{"stdout":"{}"}}"#, "x".repeat(200_000));
-        let (status, body) = send(router(st.clone()), post("/event/claude-code", &big)).await;
+        let (status, body) = send(router(st.clone()), post("/event/some-agent", &big)).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         assert!(body.is_empty());
         assert_eq!(st.queue.len(), 1);
@@ -332,7 +332,7 @@ mod tests {
         for i in 0..1500 {
             let (status, _) = send(
                 router(st.clone()),
-                post("/event/claude-code", &format!(r#"{{"n":{i}}}"#)),
+                post("/event/some-agent", &format!(r#"{{"n":{i}}}"#)),
             )
             .await;
             assert_eq!(status, StatusCode::NO_CONTENT);
@@ -348,19 +348,19 @@ mod tests {
         // The webview crashing must not take the endpoint down with it.
         let st = state();
         for _ in 0..50 {
-            send(router(st.clone()), post("/event/claude-code", "{}")).await;
+            send(router(st.clone()), post("/event/some-agent", "{}")).await;
         }
-        let (status, _) = send(router(st.clone()), post("/event/claude-code", "{}")).await;
+        let (status, _) = send(router(st.clone()), post("/event/some-agent", "{}")).await;
         assert_eq!(status, StatusCode::NO_CONTENT);
     }
 
     #[tokio::test]
     async fn health_reports_the_facts() {
         let st = state();
-        send(router(st.clone()), post("/event/claude-code", "{}")).await;
+        send(router(st.clone()), post("/event/some-agent", "{}")).await;
         st.set_webview_report(WebviewReport {
             connected: true,
-            adapters: vec!["claude-code".into()],
+            adapters: vec!["some-agent".into()],
             sessions: 2,
         });
 

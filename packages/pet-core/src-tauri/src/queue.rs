@@ -7,13 +7,16 @@
 //! this queue.
 //!
 //! It is bounded twice, by count *and* by bytes. Count alone is not enough: a
-//! single `PostToolUse` carrying the stdout of a large command can be hundreds
-//! of kilobytes, so a thousand-entry queue could hold hundreds of megabytes.
+//! single tool-completion event carrying the stdout of a large command can be
+//! hundreds of kilobytes, so a thousand-entry queue could hold hundreds of
+//! megabytes.
 //! When either bound is exceeded the **oldest** entries go, because a pet
 //! showing stale state is worse than a pet that skipped a frame.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
+
+use tokio::sync::Notify;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawEvent {
@@ -39,6 +42,10 @@ pub struct QueueStats {
 
 pub struct EventQueue {
     inner: Mutex<Inner>,
+    /// Wakes the drain task. Event-driven rather than polled, so an idle pet
+    /// runs no timer at all — I6 asks for no timers faster than 1 Hz, and the
+    /// honest reading of that is none.
+    ready: Notify,
     max_items: usize,
     max_bytes: usize,
 }
@@ -54,6 +61,7 @@ impl EventQueue {
     pub fn new(max_items: usize, max_bytes: usize) -> Self {
         Self {
             inner: Mutex::new(Inner::default()),
+            ready: Notify::new(),
             max_items,
             max_bytes,
         }
@@ -79,7 +87,17 @@ impl EventQueue {
             }
         }
         inner.stats.dropped += dropped as u64;
+        drop(inner);
+
+        // A permit is stored if nobody is waiting, so an event that arrives
+        // between drains is not lost.
+        self.ready.notify_one();
         dropped
+    }
+
+    /// Wait until there is something to drain.
+    pub async fn wait(&self) {
+        self.ready.notified().await;
     }
 
     /// Take everything currently queued.

@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import { copyHookConfig } from "./adapters/hookConfig.ts";
 import { EventLog } from "./components/EventLog.tsx";
 import { Pet } from "./components/Pet.tsx";
 import { SessionBadge } from "./components/SessionBadge.tsx";
@@ -41,6 +42,13 @@ export function App() {
   const shell = useShellSettings();
 
   useEffect(() => listenForScenarios(), []);
+
+  useEffect(() => {
+    const unlisten = listen("copy-hooks", () => void copyHookConfig());
+    return () => {
+      void unlisten.then((off) => off()).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     const unlisten = listen("toggle-event-log", () => setLogOpen((v) => !v));

@@ -20,4 +20,14 @@ export interface PetAdapter {
   readonly label: string;
   /** May return zero, one, or several events. Never throws. */
   toPetEvents(raw: unknown, ctx: AdapterContext): PetEvent[];
+
+  /**
+   * The configuration a user pastes into this agent's settings to point its
+   * hooks at `endpoint`.
+   *
+   * Lives on the adapter because it is the only thing that knows what this
+   * agent's hooks are called. Optional: an adapter for something that does not
+   * use hooks has nothing to offer here.
+   */
+  hookConfig?(endpoint: string): string;
 }

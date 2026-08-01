@@ -9,7 +9,6 @@ mod tray;
 mod window;
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -31,43 +30,6 @@ struct AgentRaw {
     at: u64,
 }
 
-/// How often the drain task wakes when the queue is empty.
-///
-/// 250 ms is imperceptible for a pet reacting to a tool call, and it keeps idle
-/// cost within I6 — Spike C measured the whole app at 0.042 % of one core while
-/// asleep, and this must not spoil that.
-const DRAIN_INTERVAL: Duration = Duration::from_millis(250);
-
-/// The exact hooks block for the running port, for tray → Copy hook config.
-///
-/// Generated rather than hardcoded because the port is configurable and a
-/// hooks file pointing at the wrong one fails silently (D9).
-pub fn hooks_block(port: u16) -> String {
-    let target = format!(
-        r#"{{"type":"http","url":"http://127.0.0.1:{port}/event/claude-code","timeout":2}}"#
-    );
-    let plain = format!(r#"[{{"hooks":[{target}]}}]"#);
-    let matched = format!(r#"[{{"matcher":".*","hooks":[{target}]}}]"#);
-    let rows = [
-        ("SessionStart", &plain),
-        ("SessionEnd", &plain),
-        ("UserPromptSubmit", &plain),
-        ("PreToolUse", &matched),
-        ("PostToolUse", &matched),
-        ("PostToolUseFailure", &matched),
-        ("PermissionRequest", &matched),
-        ("PermissionDenied", &matched),
-        ("Notification", &plain),
-        ("Stop", &plain),
-        ("StopFailure", &plain),
-    ]
-    .iter()
-    .map(|(event, body)| format!(r#"    "{event}": {body}"#))
-    .collect::<Vec<_>>()
-    .join(",\n");
-    format!("{{\n  \"hooks\": {{\n{rows}\n  }}\n}}")
-}
-
 fn main() {
     let port = server::configured_port();
     let token = std::env::var("PET_TOKEN").ok().filter(|t| !t.is_empty());
@@ -77,10 +39,23 @@ fn main() {
         // Two pets would fight over the port, and the second would exit on the
         // bind error with the first still running — confusing rather than
         // wrong. Focusing the existing one is the honest response.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // Relaunching is how a user asks to see the pet, so an explicitly
+            // hidden pet is un-hidden and the setting updated to match. The
+            // alternative is a window on screen while the tray still claims it
+            // is hidden.
             if let Some(win) = app.get_webview_window("pet") {
-                let _ = win.show();
-                window::apply_overlay_behaviour(&win);
+                let click_through = match app.try_state::<std::sync::Arc<tray::AppState>>() {
+                    Some(shared) => {
+                        let mut settings = shared.settings.lock().expect("settings poisoned");
+                        settings.hidden = false;
+                        settings::save(app, &settings);
+                        settings.click_through
+                    }
+                    None => false,
+                };
+                window::show(&win, click_through);
             }
         }))
         .manage(state.clone())
@@ -115,7 +90,6 @@ fn main() {
             });
             app.manage(shared.clone());
 
-            window::apply_overlay_behaviour(&win);
             window::place(
                 &win,
                 saved
@@ -123,26 +97,19 @@ fn main() {
                     .map(|p| window::clamp_to_visible(&win, p))
                     .unwrap_or_else(|| window::default_corner(&win)),
             );
-            window::set_click_through(&win, saved.click_through);
             tray::build(app.handle(), &saved)?;
             remember_position(&win, app.handle().clone(), shared);
-
-            // Spike C harness: render the `sleeping` equivalent so animating
-            // and static costs can be measured against the same binary.
-            if std::env::var("PET_STATIC")
-                .map(|v| v != "0")
-                .unwrap_or(false)
-            {
-                let _ = win.eval("document.body.classList.add('static')");
-                println!("[spike-c] static render mode");
-            }
 
             println!(
                 "[setup] window url = {:?}",
                 win.url().map(|u| u.to_string())
             );
-            if !saved.hidden {
-                let _ = win.show();
+            if saved.hidden {
+                // Still needs the overlay behaviour applied, so that showing it
+                // later from the tray does not start from a plain window.
+                window::apply_overlay_behaviour(&win);
+            } else {
+                window::show(&win, saved.click_through);
             }
 
             spawn_server(app.handle().clone(), state.clone());
@@ -195,6 +162,30 @@ const CONSOLE_BRIDGE: &str = r#"
 })();
 "#;
 
+/// Put text on the clipboard on the frontend's behalf.
+///
+/// The shell does the writing; the frontend decides *what*. Hook configuration
+/// is agent-specific, and I5 says only the adapter registry may know that —
+/// generating the block here would have put eleven hook event names and an
+/// agent id in the one place that is supposed to stay ignorant of both, where
+/// the I5 lint could not see them either.
+#[tauri::command]
+fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard().write_text(text).map_err(|e| e.to_string())
+}
+
+/// The current settings, for the frontend to start from.
+///
+/// The `pet-settings` event only fires when the tray changes something, so a
+/// frontend that listened and nothing else would render at its own defaults
+/// after every restart — silently discarding a scale and a glyph preference
+/// that the Rust side had loaded from disk correctly.
+#[tauri::command]
+fn get_settings(shared: tauri::State<'_, Arc<tray::AppState>>) -> settings::Settings {
+    shared.settings.lock().expect("settings poisoned").clone()
+}
+
 /// Where the frontend should post pre-normalised events.
 ///
 /// Asked for rather than assumed: the port is configurable, and a demo posting
@@ -231,9 +222,15 @@ fn spawn_server(app: tauri::AppHandle, state: Arc<ServerState>) {
 /// Everything expensive lives on this side of the queue so the HTTP handler can
 /// stay trivial (I2). If the webview is gone, emits fail harmlessly and the
 /// server keeps answering `204`.
+///
+/// Woken by the queue rather than by a timer. It was a 250 ms poll, which was
+/// cheap enough to measure clean but was still a 4 Hz clock ticking against an
+/// invariant that asks for nothing above 1 Hz while the pet is asleep. Waiting
+/// on a notification costs nothing at all and drops latency to zero.
 fn spawn_drain(app: tauri::AppHandle, state: Arc<ServerState>) {
     tauri::async_runtime::spawn(async move {
         loop {
+            state.queue.wait().await;
             for event in state.queue.drain() {
                 let payload = AgentRaw {
                     source: event.source,
@@ -244,7 +241,6 @@ fn spawn_drain(app: tauri::AppHandle, state: Arc<ServerState>) {
                     eprintln!("[drain] emit failed: {e}");
                 }
             }
-            tokio::time::sleep(DRAIN_INTERVAL).await;
         }
     });
 }
@@ -276,38 +272,6 @@ fn remember_position(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn hooks_block_is_valid_json_for_the_running_port() {
-        let text = hooks_block(48999);
-        let parsed: serde_json::Value =
-            serde_json::from_str(&text).expect("tray copies this straight into settings.json");
-        let hooks = parsed["hooks"].as_object().expect("a hooks object");
-        assert_eq!(hooks.len(), 11, "spec §5.3 registers eleven events");
-        assert!(
-            text.contains("127.0.0.1:48999"),
-            "must name the port actually in use"
-        );
-        assert!(!text.contains("48200"), "must not leak the default port");
-    }
-
-    #[test]
-    fn only_the_tool_events_carry_a_matcher() {
-        let parsed: serde_json::Value = serde_json::from_str(&hooks_block(48200)).unwrap();
-        let hooks = &parsed["hooks"];
-        assert_eq!(hooks["PreToolUse"][0]["matcher"], ".*");
-        assert!(hooks["Stop"][0]["matcher"].is_null());
-    }
-
-    #[test]
-    fn every_hook_uses_a_short_timeout() {
-        // HTTP hooks are synchronous; the agent waits for us (I2).
-        let parsed: serde_json::Value = serde_json::from_str(&hooks_block(48200)).unwrap();
-        for (event, entries) in parsed["hooks"].as_object().unwrap() {
-            let timeout = entries[0]["hooks"][0]["timeout"].as_u64().unwrap();
-            assert!(timeout <= 2, "{event} would block the agent for {timeout}s");
-        }
-    }
 
     #[test]
     fn settings_survive_a_file_that_predates_a_field() {

@@ -109,6 +109,31 @@ export const claudeCodeAdapter: PetAdapter = {
   id: ADAPTER_ID,
   label: "Claude Code",
 
+  hookConfig(endpoint: string): string {
+    const target = { type: "http", url: endpoint, timeout: 2 };
+    const plain = [{ hooks: [target] }];
+    const matched = [{ matcher: ".*", hooks: [target] }];
+    return JSON.stringify(
+      {
+        hooks: {
+          SessionStart: plain,
+          SessionEnd: plain,
+          UserPromptSubmit: plain,
+          PreToolUse: matched,
+          PostToolUse: matched,
+          PostToolUseFailure: matched,
+          PermissionRequest: matched,
+          PermissionDenied: matched,
+          Notification: plain,
+          Stop: plain,
+          StopFailure: plain,
+        },
+      },
+      null,
+      2,
+    );
+  },
+
   toPetEvents(rawInput: unknown, ctx: AdapterContext): PetEvent[] {
     if (typeof rawInput !== "object" || rawInput === null) return [];
     const raw = rawInput as RawHook;
