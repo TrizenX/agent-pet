@@ -113,3 +113,62 @@ body {
     animation: none !important;
   }
 }
+
+/* The log is a debug surface, so it takes over the window rather than trying to
+   coexist with a 208x232 pet. Opaque on purpose: this is the one thing in the
+   app meant to be read rather than glanced at. */
+.pet-log {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgb(16 16 20 / 0.96);
+  color: #e6e6ea;
+  border-radius: 8px;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.pet-log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.pet-log-head button {
+  all: unset;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.pet-log-list {
+  margin: 0;
+  padding: 4px 6px;
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.pet-log-list li {
+  display: grid;
+  grid-template-columns: 52px 62px 1fr;
+  gap: 4px;
+  padding: 1px 0;
+  white-space: nowrap;
+}
+
+.pet-log-list li[data-dropped] {
+  opacity: 0.5;
+}
+
+.pet-log-time {
+  opacity: 0.55;
+}
+.pet-log-source {
+  color: #7cd8ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

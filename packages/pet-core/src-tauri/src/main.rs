@@ -84,7 +84,11 @@ fn main() {
             }
         }))
         .manage(state.clone())
-        .invoke_handler(tauri::generate_handler![report_ready, webview_log])
+        .invoke_handler(tauri::generate_handler![
+            report_ready,
+            webview_log,
+            endpoint_url
+        ])
         // `eval` during setup runs against whatever document exists at that
         // moment and is discarded on navigation, so the bridge has to be
         // reinstalled per page load or it silently never runs.
@@ -190,6 +194,15 @@ const CONSOLE_BRIDGE: &str = r#"
   addEventListener('unhandledrejection', e => send('error', ['unhandled rejection', e.reason]));
 })();
 "#;
+
+/// Where the frontend should post pre-normalised events.
+///
+/// Asked for rather than assumed: the port is configurable, and a demo posting
+/// to the wrong one would fail silently — the same trap D9 exists to avoid.
+#[tauri::command]
+fn endpoint_url(state: tauri::State<'_, Arc<ServerState>>) -> String {
+    format!("http://127.0.0.1:{}/pet-event", state.port)
+}
 
 fn spawn_server(app: tauri::AppHandle, state: Arc<ServerState>) {
     let port = state.port;
