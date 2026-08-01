@@ -67,7 +67,24 @@ These are non-negotiable. Each has an owning test (§11).
 | Rendering | Sprite sheet (PNG) + CSS `steps()` | No canvas, no PixiJS |
 | Packaging | pnpm workspaces | |
 
-**Target OS (Phase 1):** macOS + Windows. Linux best-effort, not gated in CI.
+### 3.1 Platform support
+
+| Platform | Phase 1 | Notes |
+| :-- | :-- | :-- |
+| **macOS** | ✅ target | Floating above **full-screen** apps is not free — needs `set_visible_on_all_workspaces` plus `fullScreenAuxiliary` in the window's collection behaviour. Gated by **M0 Spike A**. |
+| **Windows** | ✅ target | WebView2. Transparency, always-on-top and click-through (`WS_EX_TRANSPARENT`) all supported. Paths: `%APPDATA%\agent-pet\packs`, `%USERPROFILE%\.petdex\pets`. |
+| **Linux · X11** | 🟡 best-effort | Works: transparency (with a compositor), always-on-top, positioning, click-through. |
+| **Linux · Wayland** | ⚠️ likely unsupported | **Wayland gives a client no way to position its own window or force always-on-top.** That is a deliberate protocol decision, not a Tauri bug. `wlr-layer-shell` can do it but Tauri does not use it and GNOME does not implement it — and GNOME/Wayland is the default on current Ubuntu and Fedora. Gated by **M0 Spike E**. |
+| **iOS / Android** | ❌ not Phase 1 | See below. |
+
+**Nothing platform-specific may leak outside the Tauri shell.** `protocol`, the adapters and `packs/` are pure TypeScript with no OS assumptions, and HTTP hooks are OS-agnostic — which is a second reason to prefer them over command hooks, whose `bash` / `powershell` split would have forked the adapter (D1, §5.3).
+
+**On mobile.** Tauri 2 does target iOS and Android, but two independent walls stand in the way, and the second is the real one:
+
+1. iOS gives third-party apps no way to draw over other apps at all. Android has `SYSTEM_ALERT_WINDOW` and Bubbles, but reaching them means a native Android service, not a Tauri window.
+2. **The agent runs on a desktop machine.** A phone cannot receive hooks aimed at `127.0.0.1:48200` on your laptop. Phase 3's Pet Protocol is what would bridge that.
+
+So the honest mobile shape is not an overlay pet at all — it is a *remote status notifier*: a push when the agent needs an approval or hits a rate limit. Worth building, but as a Phase 3 companion, and it must not be allowed to distort Phase 1's design.
 
 ---
 
@@ -622,7 +639,7 @@ Clean integer scales of either are valid. Accept both; reject anything else with
 
 ### 12.2 Loading
 
-- Scan, in order: our own app-data packs dir → `~/.petdex/pets/` → `~/.codex/pets/`. Reading the ecosystem's install roots means `npx petdex install <slug>` already works for our users on day one, with no CLI of our own.
+- Scan, in order: our own app-data packs dir → `~/.petdex/pets/` → `~/.codex/pets/` (on Windows, `%APPDATA%\agent-pet\packs` then `%USERPROFILE%\.petdex\pets` and `%USERPROFILE%\.codex\pets`). Reading the ecosystem's install roots means `npx petdex install <slug>` already works for our users on day one, with no CLI of our own.
 - Validate `pet.json` presence and sheet geometry on load. Invalid packs are skipped with a warning in the event log.
 - **The built-in pet is a pack** in exactly this format. One code path from day one — do not build a sprite system and refactor it into packs later.
 - **Tauri asset protocol:** a webview cannot load a raw filesystem path. Configure `security.assetProtocol.scope` for each scanned root and use `convertFileSrc()`. This *will* block pack loading if unplanned — budget for it.
@@ -697,7 +714,9 @@ Two unknowns can invalidate the design. Prove them before building anything.
 - [ ] **Spike C:** measure idle CPU/GPU of an animating transparent always-on-top window over 10 minutes on battery. If it is not ≈ 0 % when static, redesign the render loop now.
 - [ ] **Spike D (atlas):** `npx petdex install <slug>`, then render the sheet cell-by-cell and **empirically derive** row order and per-row frame counts for both v1 (8×9) and v2 (8×11). Commit the result as `packs/atlas.ts` with the sample pet as a test fixture. Confirm the app-data roots (`~/.petdex/pets/`, `~/.codex/pets/`) exist as documented. Do not hardcode §12.1's table from this spec.
 
-**Gate:** if Spike A fails on macOS, stop and revisit the product thesis before writing further code. If Spike D shows the atlas cannot express our ten states even with the glyph layer, reopen D10.
+- [ ] **Spike E (Linux):** the same test as Spike A across GNOME/Wayland, KDE/Wayland, GNOME/X11, KDE/X11 — transparency, always-on-top, `set_position`, `set_ignore_cursor_events`. Wayland may have no answer (§3.1). Lower priority than A: Linux is not a Phase 1 target, but this must run before any public claim of Linux support, and the outcome must be a recorded decision, not a "TBD".
+
+**Gate:** if Spike A fails on macOS, stop and revisit the product thesis before writing further code. If Spike D shows the atlas cannot express our ten states even with the glyph layer, reopen D10. Spike E does not gate anything — it decides whether Linux is advertised at all.
 
 ### M1 — Skeleton (end of week 1)
 
@@ -736,7 +755,7 @@ Two unknowns can invalidate the design. Prove them before building anything.
 
 ## 15. Out of scope
 
-**Phase 1:** pet levelling/growth · multiplayer/sync · LLM-generated dialogue · git adapter · settings UI beyond the tray · auto-update · remote agents (SSH / devcontainer / web Claude Code cannot reach a local pet — Phase 3's protocol is the answer, and this limitation must be stated in the README).
+**Phase 1:** pet levelling/growth · multiplayer/sync · LLM-generated dialogue · git adapter · settings UI beyond the tray · auto-update · **iOS/Android in any form** (§3.1) · remote agents (SSH / devcontainer / web Claude Code cannot reach a local pet — Phase 3's protocol is the answer, and this limitation must be stated in the README).
 
 **Phase 1.5:** in-app pack editor · running our own pet gallery or CDN (D10/D11 — the ecosystem already has one; we are a client) · any CLI of our own for installing pets.
 
