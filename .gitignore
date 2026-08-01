@@ -23,8 +23,3 @@ target/
 /packages/pet-core/src-tauri/gen/schemas/
 __pycache__/
 *.pyc
-
-# The Spike A placeholder frontend must be tracked even though `dist/` is
-# ignored generally — M1 replaces it with a real Vite build.
-!packages/pet-core/dist/
-!packages/pet-core/dist/index.html

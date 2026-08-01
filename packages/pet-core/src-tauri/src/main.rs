@@ -43,7 +43,17 @@ fn main() {
 
     tauri::Builder::default()
         .manage(state.clone())
-        .invoke_handler(tauri::generate_handler![report_ready])
+        .invoke_handler(tauri::generate_handler![report_ready, webview_log])
+        // `eval` during setup runs against whatever document exists at that
+        // moment and is discarded on navigation, so the bridge has to be
+        // reinstalled per page load or it silently never runs.
+        .on_page_load(|win, _| {
+            println!(
+                "[webview] page loaded: {}",
+                win.url().map(|u| u.to_string()).unwrap_or_default()
+            );
+            let _ = win.eval(CONSOLE_BRIDGE);
+        })
         .setup(move |app| {
             // No Dock icon and no menu bar: this is a tray-resident overlay, not
             // a foreground app. Also stops the pet appearing in Cmd-Tab.
@@ -67,6 +77,10 @@ fn main() {
                 println!("[spike-c] static render mode");
             }
 
+            println!(
+                "[setup] window url = {:?}",
+                win.url().map(|u| u.to_string())
+            );
             let _ = win.show();
 
             spawn_server(app.handle().clone(), state.clone());
@@ -87,6 +101,37 @@ fn report_ready(state: tauri::State<'_, Arc<ServerState>>, adapters: Vec<String>
         sessions,
     });
 }
+
+/// Surfaces webview errors on stdout.
+///
+/// A transparent, undecorated overlay has nowhere to show a failure — a broken
+/// frontend and a working one both look like an empty screen. Without this the
+/// only symptom of a crashed renderer is a pet that never appears.
+#[tauri::command]
+fn webview_log(level: String, message: String) {
+    println!("[webview:{level}] {message}");
+}
+
+/// Injected before the app script so a failure during module evaluation is
+/// still reported.
+const CONSOLE_BRIDGE: &str = r#"
+(() => {
+  const send = (level, args) => {
+    try {
+      window.__TAURI_INTERNALS__.invoke('webview_log', {
+        level,
+        message: args.map(a => (a && a.stack) ? a.stack : String(a)).join(' '),
+      });
+    } catch {}
+  };
+  for (const level of ['error', 'warn', 'log']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => { send(level, args); original(...args); };
+  }
+  addEventListener('error', e => send('error', [e.message, e.filename + ':' + e.lineno]));
+  addEventListener('unhandledrejection', e => send('error', ['unhandled rejection', e.reason]));
+})();
+"#;
 
 fn spawn_server(app: tauri::AppHandle, state: Arc<ServerState>) {
     let port = state.port;

@@ -1,0 +1,96 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useReducer, useRef } from "react";
+import { ADAPTERS } from "../adapters/registry.ts";
+import { type AgentRaw, ingestInto } from "../pipeline.ts";
+import { type RegistrySnapshot, SessionRegistry } from "../sessions/registry.ts";
+
+/**
+ * Subscribes to the shell, feeds the pipeline, and re-renders on change.
+ *
+ * The shell forwards raw payloads and nothing else — no parsing, no
+ * interpretation (I2). Everything that costs time happens here, on the far
+ * side of the queue, where the agent is not waiting for it.
+ */
+
+/**
+ * How often the registry is ticked.
+ *
+ * Once every 30 s: fast enough that a wedged state clears within a rounding
+ * error of the five-minute watchdog, slow enough to stay inside I6. Nothing
+ * else in the app polls.
+ */
+const TICK_MS = 30_000;
+
+/** Last N events, in memory only — payloads carry paths and prompt text (§10). */
+const LOG_LIMIT = 200;
+
+export interface LogEntry {
+  readonly at: number;
+  readonly source: string;
+  readonly summary: string;
+}
+
+export interface AgentEventsState {
+  readonly snapshot: RegistrySnapshot;
+  readonly log: readonly LogEntry[];
+}
+
+export function useAgentEvents(): AgentEventsState {
+  const registry = useRef<SessionRegistry>(undefined);
+  registry.current ??= new SessionRegistry();
+
+  const log = useRef<LogEntry[]>([]);
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    const reg = registry.current;
+    if (!reg) return;
+
+    const record = (entry: LogEntry) => {
+      log.current = [...log.current.slice(-(LOG_LIMIT - 1)), entry];
+    };
+
+    const handle = (raw: AgentRaw) => {
+      const result = ingestInto(reg, raw);
+      record({
+        at: raw.at,
+        source: raw.source,
+        summary: result.dropped
+          ? `dropped: ${result.dropped}`
+          : result.events.map((e) => e.type).join(", "),
+      });
+      bump();
+    };
+
+    const unlisten = listen<AgentRaw>("agent-raw", (e) => handle(e.payload));
+
+    const timer = setInterval(() => {
+      const evicted = reg.tick(Date.now());
+      if (evicted.length > 0) {
+        record({ at: Date.now(), source: "registry", summary: `evicted ${evicted.join(", ")}` });
+      }
+      bump();
+    }, TICK_MS);
+
+    // Lets /health answer for the whole app while the shell stays ignorant of
+    // which agents exist (I5).
+    void invoke("report_ready", {
+      adapters: ADAPTERS.map((a) => a.id),
+      sessions: reg.size,
+    }).catch(() => {
+      /* running outside the shell, e.g. `vite` on its own */
+    });
+
+    return () => {
+      clearInterval(timer);
+      void unlisten.then((off) => off()).catch(() => {});
+      reg.clear();
+    };
+  }, []);
+
+  return {
+    snapshot: registry.current.snapshot(),
+    log: log.current,
+  };
+}

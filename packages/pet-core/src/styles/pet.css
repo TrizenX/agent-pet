@@ -1,0 +1,115 @@
+/* The window is transparent and always on top; anything opaque here is
+   something the user has to look past all day. Only the pet is. */
+:root {
+  color-scheme: dark light;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  font:
+    600 12px/1.3 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+#root {
+  height: 100%;
+}
+
+.pet-root {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: end center;
+  cursor: grab;
+}
+
+.pet-root:active {
+  cursor: grabbing;
+}
+
+.pet-sprite {
+  background-repeat: no-repeat;
+  /* Integer-scaled pixel art: smoothing turns 192×208 frames to mush. */
+  image-rendering: pixelated;
+}
+
+.pet-glyph {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.72);
+}
+
+.pet-glyph[data-glow="amber-pulse"] {
+  box-shadow: 0 0 0 2px rgb(255 176 32 / 0.9);
+  animation: pet-pulse 1.1s ease-in-out infinite;
+}
+.pet-glyph[data-glow="red-flash"] {
+  box-shadow: 0 0 0 2px rgb(255 92 92 / 0.95);
+}
+.pet-glyph[data-glow="red-dim"] {
+  box-shadow: 0 0 0 2px rgb(180 70 70 / 0.6);
+}
+
+@keyframes pet-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(255 176 32 / 0.9);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgb(255 176 32 / 0);
+  }
+}
+
+.pet-bubble {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: #fff;
+  background: rgb(0 0 0 / 0.78);
+}
+
+.pet-bubble-project {
+  opacity: 0.62;
+  margin-right: 6px;
+}
+
+.pet-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(124 92 255 / 0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-sprite,
+  .pet-glyph {
+    animation: none !important;
+  }
+}
