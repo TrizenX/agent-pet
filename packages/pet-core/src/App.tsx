@@ -1,8 +1,11 @@
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import { EventLog } from "./components/EventLog.tsx";
 import { Pet } from "./components/Pet.tsx";
 import { SessionBadge } from "./components/SessionBadge.tsx";
 import { SpeechBubble } from "./components/SpeechBubble.tsx";
 import { StateGlyph } from "./components/StateGlyph.tsx";
+import { listenForScenarios } from "./demo/runner.ts";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
 import { useShellSettings } from "./hooks/useShellSettings.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
@@ -32,9 +35,19 @@ function usePrefersReducedMotion(): boolean {
 
 export function App() {
   const [pack, setPack] = useState<LoadedPack | null>(null);
-  const { snapshot } = useAgentEvents();
+  const { snapshot, log } = useAgentEvents();
+  const [logOpen, setLogOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const shell = useShellSettings();
+
+  useEffect(() => listenForScenarios(), []);
+
+  useEffect(() => {
+    const unlisten = listen("toggle-event-log", () => setLogOpen((v) => !v));
+    return () => {
+      void unlisten.then((off) => off()).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -67,6 +80,7 @@ export function App() {
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
       <Pet pack={pack} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
+      <EventLog entries={log} open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
   );
 }
