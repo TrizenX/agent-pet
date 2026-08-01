@@ -38,6 +38,13 @@ fn main() {
                 ));
             }
 
+            // Spike C harness: render the `sleeping` equivalent so animating
+            // and static costs can be measured against the same binary.
+            if std::env::var("PET_STATIC").map(|v| v != "0").unwrap_or(false) {
+                let _ = win.eval("document.body.classList.add('static')");
+                println!("[spike-c] static render mode");
+            }
+
             let _ = win.show();
             println!("[spike-a] overlay window shown");
             Ok(())
