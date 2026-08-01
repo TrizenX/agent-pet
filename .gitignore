@@ -1,0 +1,20 @@
+node_modules/
+dist/
+target/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# Spike scratch: third-party sprite sheets are downloaded here and never
+# committed. See D11 — we render other people's pets, we do not redistribute
+# them.
+/tmp/
+*.webp
+!packages/pet-core/src/packs/default/spritesheet.webp
+
+# D11 — contact sheets and filmstrips are renderings of third-party pet art.
+# Committing them to a public repo would be redistribution. Only the derived
+# numbers (*.json) and FINDINGS.md are tracked; regenerate the images with
+# tools/spike-atlas/.
+/artifacts/**/*.png
