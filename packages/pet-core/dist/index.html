@@ -58,6 +58,11 @@
           animation: none;
         }
       }
+      /* Invariant I6: `sleeping` must be genuinely static — `animation: none`,
+         not a low frame rate. Spike C measures the difference. */
+      body.static .body {
+        animation: none;
+      }
     </style>
   </head>
   <body>
