@@ -35,7 +35,10 @@ describe("scenarios are well-formed", () => {
   it("never moves time backwards", () => {
     for (const scenario of SCENARIOS) {
       const times = timeline(scenario, T0).map((e) => e.at);
-      expect([...times].sort((a, b) => a - b), scenario.id).toEqual(times);
+      expect(
+        [...times].sort((a, b) => a - b),
+        scenario.id,
+      ).toEqual(times);
     }
   });
 
@@ -65,9 +68,7 @@ describe("scenarios drive the real pipeline", () => {
   it("`approval` shows the wave and then resumes", () => {
     const { states } = replay("approval");
     expect(states).toContain("waiting_approval");
-    expect(states.indexOf("working.generic")).toBeGreaterThan(
-      states.indexOf("waiting_approval"),
-    );
+    expect(states.indexOf("working.generic")).toBeGreaterThan(states.indexOf("waiting_approval"));
   });
 
   it("`rate-limit` reaches exhausted and recovers on the next prompt", () => {
