@@ -6,7 +6,7 @@
 //! Many developers run their terminal full-screen, so without this the pet
 //! disappears exactly when it matters.
 
-use tauri::WebviewWindow;
+use tauri::{PhysicalPosition, WebviewWindow};
 
 /// Make the window behave as a system overlay: visible on every Space,
 /// including the Space a full-screen app creates for itself.
@@ -215,5 +215,63 @@ mod macos {
             // lifetime, not a bug.
             std::mem::forget(block);
         }
+    }
+}
+
+/// Keep a remembered position on a monitor that still exists.
+///
+/// Undocking a laptop is enough to leave a saved position on a screen that is
+/// no longer there, and a window placed off every display is invisible and
+/// unrecoverable — the user has no way to drag back something they cannot see.
+/// Anything outside the union of current monitors goes bottom-right of the
+/// primary.
+pub fn clamp_to_visible(win: &WebviewWindow, wanted: (i32, i32)) -> (i32, i32) {
+    let size = win.outer_size().unwrap_or_default();
+    let (w, h) = (size.width as i32, size.height as i32);
+
+    let monitors = win.available_monitors().unwrap_or_default();
+    let visible = monitors.iter().any(|m| {
+        let pos = m.position();
+        let ms = m.size();
+        // A window counts as reachable if a decent slab of it is on screen; a
+        // few pixels peeking over an edge is not something a user can grab.
+        let overlap_x = (wanted.0 + w).min(pos.x + ms.width as i32) - wanted.0.max(pos.x);
+        let overlap_y = (wanted.1 + h).min(pos.y + ms.height as i32) - wanted.1.max(pos.y);
+        overlap_x > w / 2 && overlap_y > h / 2
+    });
+
+    if visible {
+        return wanted;
+    }
+    default_corner(win)
+}
+
+/// Bottom-right of the primary monitor, inset from the edges.
+pub fn default_corner(win: &WebviewWindow) -> (i32, i32) {
+    let Ok(Some(monitor)) = win.primary_monitor() else {
+        return (0, 0);
+    };
+    let screen = monitor.size();
+    let scale = monitor.scale_factor();
+    let size = win.outer_size().unwrap_or_default();
+    let margin = (48.0 * scale) as i32;
+    (
+        screen.width as i32 - size.width as i32 - margin,
+        screen.height as i32 - size.height as i32 - margin * 2,
+    )
+}
+
+pub fn place(win: &WebviewWindow, at: (i32, i32)) {
+    let _ = win.set_position(PhysicalPosition::new(at.0, at.1));
+}
+
+/// Toggle click-through.
+///
+/// While this is on the pet cannot be dragged, which is why the tray item says
+/// so and why the tray is always the way back. Leaving a user with a window
+/// they can neither click nor move would be unrecoverable without quitting.
+pub fn set_click_through(win: &WebviewWindow, on: bool) {
+    if let Err(e) = win.set_ignore_cursor_events(on) {
+        eprintln!("[window] click-through toggle failed: {e}");
     }
 }
