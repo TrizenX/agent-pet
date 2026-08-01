@@ -88,3 +88,31 @@ Nothing to act on today. It becomes relevant at M2's soak test, where the criter
 | C2 | Keep `PET_STATIC` so `sleeping` stays measurable against the shipping binary | `main.rs` ✅ done |
 | C3 | Track RSS in the M2 soak — the criterion is *flat*, not *small* | TZX-72 |
 | C4 | Re-measure on a release build with real sprite art before any performance claim | TZX-69 |
+
+
+---
+
+## Re-measured 2026-08-01, with the real renderer (M1 acceptance)
+
+Spike C ran against the placeholder frontend — one CSS transform on a coloured
+rectangle. With the actual sprite atlas and React in place:
+
+| Mode | CPU (% of one core) | RSS |
+| :-- | --: | :-- |
+| animating (held in `working`) | **1.399 %** | 355.8 → 358.9 MB |
+| at rest (`sleeping`) | **0.116 %** | 358.9 → 358.8 MB |
+
+**I6 still passes**, with more headroom than the threshold needs. Animating cost
+rose from 0.200 % to 1.399 %, which is the honest price of stepping a
+1536 × 1872 sheet instead of translating a rectangle — still small enough that
+it is not the thing to optimise.
+
+RSS rose from ~275 MB to ~359 MB once the atlas is decoded and React is
+resident. C3's conclusion is unchanged and now firmer: **memory is the cost
+worth watching, not CPU.** The criterion at TZX-72 remains *flat*, not *small* —
+and it was flat across this window.
+
+`PET_STATIC` was removed. `sleeping` is reached through the state machine now,
+so the flag would have been a second, divergent path to the very thing being
+measured, and the CSS rule it depended on no longer existed — dead code that
+still looked like it worked.

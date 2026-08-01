@@ -127,16 +127,6 @@ fn main() {
             tray::build(app.handle(), &saved)?;
             remember_position(&win, app.handle().clone(), shared);
 
-            // Spike C harness: render the `sleeping` equivalent so animating
-            // and static costs can be measured against the same binary.
-            if std::env::var("PET_STATIC")
-                .map(|v| v != "0")
-                .unwrap_or(false)
-            {
-                let _ = win.eval("document.body.classList.add('static')");
-                println!("[spike-c] static render mode");
-            }
-
             println!(
                 "[setup] window url = {:?}",
                 win.url().map(|u| u.to_string())
