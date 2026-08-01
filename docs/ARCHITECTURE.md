@@ -52,3 +52,26 @@ Upstream publishes row *names* but not row *order* or frame counts. Both were de
 - **Frame counts are per-sheet, not per-format** — some pets pad every row to 8 by repeating frames. The loader counts live frames at load time and never assumes.
 
 Provenance is documented here rather than in `atlas.ts` because `pet-core` must not name any agent's ecosystem (I5). To that file, this is just an art format.
+
+## The response path is deliberately empty
+
+`POST /event/:source` does four things and nothing else: check the headers, copy the body into a bounded queue, increment a counter, return `204`. It does not parse JSON, does not touch the webview, and does not wait on any consumer.
+
+That shape is what makes the two hard invariants structural rather than aspirational:
+
+- **I1** — there is no code path that can return anything but `204` to a hook, because there is no code that inspects the body. Malformed input cannot produce a `400`, because nothing tries to read it.
+- **I2** — the work the agent waits for is a header check and a `memcpy`. Parsing, adapter mapping, session routing and rendering all happen on the far side of the queue, on a task the agent never blocks on.
+
+### Why the body limit is 1 MB and not 8 KB
+
+The spec originally said "reject bodies > 8 KB with `413`". Implementing it showed the rule contradicts I1: a `PostToolUse` payload embeds the tool's *entire* response, so a `Read` of a large file or a chatty command produces hundreds of kilobytes of perfectly legitimate hook traffic. Rejecting it would mean answering a genuine hook with a non-`204`.
+
+So the hard limit moved to 1 MB — high enough that no real hook trips it, low enough to refuse something pathological — and the protection that actually matters moved to the queue, which is bounded by **both** item count (1 000) and total bytes (8 MB).
+
+The byte bound is not redundant. A thousand-entry queue holding 300 KB payloads is 300 MB; count alone does not bound memory when one event can be large. When either bound is hit the **oldest** entries are shed, because a pet showing stale state is worse than a pet that skipped a frame.
+
+### The browser lockout
+
+The guard refuses any request carrying `Origin`, `Sec-Fetch-Site` or `Sec-Fetch-Mode`. Browsers always send at least one; hooks never do. Page script cannot suppress them — they are forbidden header names.
+
+One rule, no configuration, and it closes the whole "any web page can POST to your loopback port" vector. The optional `PET_TOKEN` is hardening on top, not the primary defence.

@@ -184,7 +184,7 @@ agent-pet/
 
 ```
 Claude Code ──HTTP hook──▶ POST /event/claude-code        (raw agent payload)
-                              │  guard.rs: ≤8 KB, no Origin, loopback, optional token
+                              │  guard.rs: ≤1 MB, no Origin, loopback, optional token
                               │  ── respond 204 IMMEDIATELY (I1, I2) ──▶ agent continues
                               ▼
                            channel (never blocks the response)
@@ -543,7 +543,7 @@ The threat model is small but not empty, and the mitigations are cheap.
 | Control | Rule |
 | :-- | :-- |
 | Bind | `127.0.0.1` only. Never `0.0.0.0`. |
-| Size | Reject bodies > 8 KB with `413`. |
+| Size | Hard ceiling of **1 MB**, rejected with `413`. **Corrected from 8 KB during TZX-66.** A `PostToolUse` payload embeds the tool's entire response, so reading a large file or running a chatty command routinely produces hundreds of kilobytes — refusing those would mean answering a genuine hook with something other than `204`, which I1 forbids. The 1 MB limit exists only to stop something pathological; *accumulation* is bounded by the queue (1 000 items **and** 8 MB, drop-oldest), which is where the real protection lives. |
 | Content type | Require `application/json`. |
 | **Browser lockout** | **Reject any request carrying an `Origin` or `Sec-Fetch-Site` header.** Browsers always send these; hooks never do. One rule, zero config, and it closes the entire "any web page can POST to your loopback port" vector. |
 | Token *(optional hardening)* | If `PET_TOKEN` is set, require `X-Pet-Token`. The `http` hook type supports `headers` with `allowedEnvVars`, so this costs one line in `hooks.json`. Promoted from Phase 3 to Phase 1 because it is nearly free. |
@@ -584,7 +584,7 @@ A tray-toggled window listing the last 200 events: `time · source · session ·
 | `sessions/focus` | Approval outranks recency; oldest-attention wins; eviction after 10 min | — |
 | `packs/atlas` + `loader` | v1 (1536×1872) and v2 (1536×2288) accepted; 2× scales accepted; wrong geometry rejected with a warning, not a crash; missing `pet.json` skipped; empty row falls back to `idle` | I4 |
 | `packs/stateMap` | Every one of the 10 states resolves to a row that exists in the golden fixture pet | — |
-| `server` | Always 204; > 8 KB → 413; `Origin` present → 403; malformed JSON → 204 + drop; 1 000-event burst → no backpressure | I1, I2 |
+| `server` | Always 204 with an empty body; a 200 KB payload still 204; > 1 MB → 413; `Origin`/`Sec-Fetch-*` present → 403; malformed JSON → 204 + drop; 1 500-event burst → no backpressure, oldest shed; busy port fails loudly | I1, I2 |
 | **latency** | Median tool-call latency with pet running vs. pet killed: **Δ < 5 ms**. With `--hang` debug flag: Δ ≤ 2 s once, and the agent still completes | **I2** |
 | `lint:no-agent-strings` | Grep `pet-core/src` excluding `adapters/registry.ts` for `claude`, tool names, hook event names → must be empty | **I5** |
 | `install.ts` | Merge preserves unrelated hooks; idempotent across three runs; uninstall restores byte-identical original | — |
