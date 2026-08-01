@@ -58,13 +58,19 @@ export function useAgentEvents(): AgentEventsState {
     // Re-reported whenever the count changes, not just once at mount. Reporting
     // only at mount pinned `sessions` at 0 forever — the M2 invariant suite
     // caught it by asking /health a question the app could not answer honestly.
-    let lastReported = -1;
+    let lastReported = "";
     const report = () => {
-      if (reg.size === lastReported) return;
-      lastReported = reg.size;
+      const snap = reg.snapshot();
+      const focusedState = snap.focused?.state ?? "sleeping";
+      const focusedProject = snap.focused?.project ?? "";
+      const key = `${reg.size}|${focusedState}|${focusedProject}`;
+      if (key === lastReported) return;
+      lastReported = key;
       void invoke("report_ready", {
         adapters: ADAPTERS.map((a) => a.id),
         sessions: reg.size,
+        focusedState,
+        focusedProject,
       }).catch(() => {
         /* running outside the shell, e.g. `vite` on its own */
       });

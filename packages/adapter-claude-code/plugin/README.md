@@ -15,11 +15,13 @@ tool call, so the pet's server has no code path that reads the request or produc
 decision (spec invariant I1).
 
 If the pet is not running, the connection is refused instantly on loopback and the hook
-costs nothing measurable. Measured delta with the pet running versus killed: **0.21 ms**.
+costs nothing measurable. Measured round-trip with the pet running: **0.16 ms**; with it killed, 0.11 ms to be
+refused. (An earlier 0.21 ms figure was `curl` startup, not the endpoint.)
 
 ## Moving the port
 
-The endpoint is baked into the URLs below, so `PET_PORT` needs the hooks regenerated:
+The endpoint is baked into the hook URLs, so a non-default `PET_PORT` needs a different
+block. `doctor` prints the right one and tells you what is currently wired:
 
 ```
 node packages/adapter-claude-code/src/cli.ts doctor --port 49000

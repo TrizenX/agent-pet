@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
-import { hooksBlock, startRecorder } from "./record.ts";
+import { claudeCodeAdapter } from "./mapping.ts";
+import { startRecorder } from "./record.ts";
 import {
   installedEvents,
   installHooks,
@@ -22,6 +23,19 @@ import {
 const DEFAULT_PORT = 48200;
 const RECORD_PORT = 48201;
 
+/**
+ * The one place a hook block comes from.
+ *
+ * There used to be a second, hand-written copy here for the install path — the
+ * exact thing `scripts/generate-hooks-json.mjs` was added to prevent, sitting
+ * in the path that milestone shipped. The drift check only compared the
+ * adapter against the plugin file, so this copy was never covered by it.
+ */
+function hooksFor(port: number): Record<string, unknown[]> {
+  const text = claudeCodeAdapter.hookConfig?.(ourUrl(port)) ?? "{}";
+  return (JSON.parse(text) as { hooks?: Record<string, unknown[]> }).hooks ?? {};
+}
+
 function flag(argv: readonly string[], name: string): string | undefined {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? argv[i + 1] : undefined;
@@ -35,7 +49,7 @@ function portFrom(argv: readonly string[], fallback: number): number {
 
 function cmdInstall(argv: readonly string[]): number {
   const port = portFrom(argv, DEFAULT_PORT);
-  const { backup, events } = installHooks(hooksBlock(port) as Record<string, unknown[]>, port);
+  const { backup, events } = installHooks(hooksFor(port), port);
   console.log(`installed ${events.length} hook events into ${SETTINGS_PATH}`);
   console.log(`  endpoint: ${ourUrl(port)}`);
   console.log(backup ? `  backup:   ${backup}` : "  backup:   none (file did not exist)");
@@ -116,6 +130,15 @@ async function cmdDoctor(argv: readonly string[]): Promise<number> {
     console.log("running on another port, reinstall the hooks with --port.");
   }
 
+  // §5.4 asks doctor for two things: which path is active, and the correct
+  // block for the current port. The rewrite delivered the first and dropped
+  // the second — while the plugin README it shipped alongside told users to
+  // run `doctor --port N` precisely to get the block. Printing it is also the
+  // whole answer for a non-default port, which is the case D9 refuses to
+  // paper over.
+  console.log("\nHooks for this port — paste into the `hooks` object of that file:\n");
+  console.log(claudeCodeAdapter.hookConfig?.(ourUrl(port)) ?? "");
+
   return healthy && (plugin || installed.length > 0) ? 0 : 1;
 }
 
@@ -126,7 +149,7 @@ function cmdRecord(argv: readonly string[]): number {
   const redactPayloads = !argv.includes("--no-redact");
 
   if (install) {
-    const { backup } = installHooks(hooksBlock(port) as Record<string, unknown[]>, port);
+    const { backup } = installHooks(hooksFor(port), port);
     console.log(`[record] hooks installed (backup: ${backup ?? "none"})`);
     console.log("[record] they will be removed on exit\n");
   }

@@ -123,11 +123,19 @@ fn main() {
 /// Called by the webview once its adapter registry is up, so `/health` can
 /// answer for the whole app rather than only for the shell.
 #[tauri::command]
-fn report_ready(state: tauri::State<'_, Arc<ServerState>>, adapters: Vec<String>, sessions: usize) {
+fn report_ready(
+    state: tauri::State<'_, Arc<ServerState>>,
+    adapters: Vec<String>,
+    sessions: usize,
+    focused_state: String,
+    focused_project: String,
+) {
     state.set_webview_report(WebviewReport {
         connected: true,
         adapters,
         sessions,
+        focused_state,
+        focused_project,
     });
 }
 
