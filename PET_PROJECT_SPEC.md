@@ -513,6 +513,8 @@ Two reasons this layer exists:
 1. **It closes the row deficit.** The atlas has 9 animation rows; we have 10 states. The glyph disambiguates states that must share a row (`error` vs `exhausted`) without asking pack authors for extra art.
 2. **It preserves §1.1 across third-party art.** A 4 000-pet gallery has wildly varying legibility. The glyph guarantees that "waiting on you" and "rate-limited" are readable *no matter which pet the user installed*. It is the instrument, drawn over the toy.
 
+**Spike D · F5 upgraded this layer from useful to load-bearing.** Row 7 is documented upstream as a generic run loop; in practice `frog` draws a laptop, `slime` draws a barely perceptible expression change, and `boba` is near-indistinguishable from idle. Body animation alone provably cannot carry state across the gallery. The glyph is the only part of the render that we control on every pet.
+
 The glyph respects `prefers-reduced-motion` (no pulse, static only) and is disableable from the tray.
 
 ---
@@ -610,7 +612,13 @@ Clean integer scales of either are valid. Accept both; reject anything else with
 | `running` | Generic in-place run loop |
 | `review` | Focused inspecting / thinking loop |
 
-⚠️ **Row *order* and per-row frame counts are not documented anywhere and must not be hardcoded from this table.** Derive them empirically in **M0 Spike D** by rendering a known pet cell-by-cell, exactly as §11.1 derives hook payloads. The two v2 rows are likewise unnamed here — detect by sheet height, and fall back to v1 behaviour if their meaning is unknown.
+✅ **Resolved by [M0 Spike D](artifacts/spike-d/FINDINGS.md), 2026-08-01.** Five sheets across both versions:
+
+- **Row order is stable** and matches the table above. Safe to hardcode as an enum → `packs/atlas.ts`.
+- **Frame counts are per-sheet, not per-format.** Three of four v1 sheets carried `[6,8,8,4,5,8,6,6,6]`, but `cactus` pads every row to 8 by repeating frames and `boba` carries 7 on row 0. **The loader must count live frames per row at load time; a hardcoded table would play padding as animation.** The modal vector is informational only.
+- **Rows 1 and 2 are a mirror pair** (near-pixel-perfect on two sheets). A pack missing row 2 can synthesise it by flipping row 1.
+- **v2 = v1 rows 0–8 plus two appended rows** of undocumented meaning. Ignore rows 9–10 in Phase 1.
+- **Row 7's semantics are author-dependent** — see F5 in the findings, and §9.5.
 
 ### 12.2 Loading
 
@@ -629,8 +637,8 @@ Clean integer scales of either are valid. Accept both; reject anything else with
 | `sleeping` | `waiting` | 0 (static frame — **I6**) | hold | — |
 | `idle` | `idle` | 1× | loop | — |
 | `attentive` | `jumping` → `idle` | 1× | one-shot, then loop | — |
-| `working.digging` | `running` | 1× | loop | — |
-| `working.typing` | `running-right` | 1× | loop | — |
+| `working.digging` | `running-right` | 1× | loop | — |
+| `working.typing` | `running` | 1× | loop | — |
 | `working.reading` | `review` | 1× | loop | — |
 | `working.generic` | `running` | 0.8× | loop | — |
 | `waiting_approval` | `waving` | 1× | loop | ❓ + amber pulse |
@@ -638,7 +646,9 @@ Clean integer scales of either are valid. Accept both; reject anything else with
 | `exhausted` | `failed` | 0.4× | hold last frame | 🔋 + dim red |
 | `celebrating` | `jumping` | 1.2× | loop 4 s | 🏆 |
 
-`running-left` is unused in Phase 1; reserved for the Phase 1.5 walk-across-screen idle behaviour. Any row missing or empty in a given pack falls back to `idle` — never crash, never freeze.
+`running-left` is unused in Phase 1; reserved for the Phase 1.5 walk-across-screen idle behaviour, and synthesisable by flipping row 1. Any row missing or empty in a given pack falls back to `idle` — never crash, never freeze.
+
+**Spike D · F6 swapped `typing` and `digging` relative to spec v2.1.** Where authors interpreted row 7 (`running`) at all, they drew *working at a laptop* — `frog` literally types on one — which is our `typing`, not our `bash`. Row 1 is a genuine motion cycle on every sheet and reads as effort, so `digging` takes it.
 
 ### 12.4 Gallery integration (M3, opt-in)
 

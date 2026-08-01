@@ -25,3 +25,17 @@ jobs:
       # Invariant I5: pet-core must contain zero hardcoded agent knowledge.
       - run: pnpm lint:no-agent-strings
       - run: pnpm test
+
+  spike-tools:
+    # The Spike D scripts are the source of truth for the atlas layout; keep
+    # them at least importable so they do not rot between milestones.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install Pillow
+      - run: |
+          python3 -m py_compile tools/spike-atlas/derive_atlas.py
+          python3 -m py_compile tools/spike-atlas/verify_rows.py
