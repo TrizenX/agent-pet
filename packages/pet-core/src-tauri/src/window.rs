@@ -67,14 +67,18 @@ mod macos {
     /// Spike A · A3 showed the plain NSWindow route does not survive a
     /// full-screen transition.
     fn use_panel() -> bool {
-        std::env::var("PET_USE_NSPANEL").map(|v| v != "0").unwrap_or(true)
+        std::env::var("PET_USE_NSPANEL")
+            .map(|v| v != "0")
+            .unwrap_or(true)
     }
 
     const NONACTIVATING_PANEL: u64 = 1 << 7;
 
     extern "C" {
-        fn object_setClass(obj: *mut Object, cls: *const objc::runtime::Class)
-            -> *const objc::runtime::Class;
+        fn object_setClass(
+            obj: *mut Object,
+            cls: *const objc::runtime::Class,
+        ) -> *const objc::runtime::Class;
     }
 
     /// Re-class the Tauri NSWindow as an NSPanel and mark it non-activating.

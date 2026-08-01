@@ -39,3 +39,19 @@ jobs:
       - run: |
           python3 -m py_compile tools/spike-atlas/derive_atlas.py
           python3 -m py_compile tools/spike-atlas/verify_rows.py
+
+  rust:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/pet-core/src-tauri
+      - name: Placeholder frontend for tauri-build
+        run: test -f packages/pet-core/dist/index.html
+      - run: cargo fmt --manifest-path packages/pet-core/src-tauri/Cargo.toml -- --check
+      # I1 and I2 are enforced by these tests; they are not optional.
+      - run: cargo test --manifest-path packages/pet-core/src-tauri/Cargo.toml
