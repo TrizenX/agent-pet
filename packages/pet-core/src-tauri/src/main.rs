@@ -4,13 +4,15 @@
 mod guard;
 mod queue;
 mod server;
+mod settings;
+mod tray;
 mod window;
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{Emitter, Manager, PhysicalPosition};
+use tauri::{Emitter, Manager};
 
 use server::{ServerState, WebviewReport};
 
@@ -36,12 +38,51 @@ struct AgentRaw {
 /// asleep, and this must not spoil that.
 const DRAIN_INTERVAL: Duration = Duration::from_millis(250);
 
+/// The exact hooks block for the running port, for tray → Copy hook config.
+///
+/// Generated rather than hardcoded because the port is configurable and a
+/// hooks file pointing at the wrong one fails silently (D9).
+pub fn hooks_block(port: u16) -> String {
+    let target = format!(
+        r#"{{"type":"http","url":"http://127.0.0.1:{port}/event/claude-code","timeout":2}}"#
+    );
+    let plain = format!(r#"[{{"hooks":[{target}]}}]"#);
+    let matched = format!(r#"[{{"matcher":".*","hooks":[{target}]}}]"#);
+    let rows = [
+        ("SessionStart", &plain),
+        ("SessionEnd", &plain),
+        ("UserPromptSubmit", &plain),
+        ("PreToolUse", &matched),
+        ("PostToolUse", &matched),
+        ("PostToolUseFailure", &matched),
+        ("PermissionRequest", &matched),
+        ("PermissionDenied", &matched),
+        ("Notification", &plain),
+        ("Stop", &plain),
+        ("StopFailure", &plain),
+    ]
+    .iter()
+    .map(|(event, body)| format!(r#"    "{event}": {body}"#))
+    .collect::<Vec<_>>()
+    .join(",\n");
+    format!("{{\n  \"hooks\": {{\n{rows}\n  }}\n}}")
+}
+
 fn main() {
     let port = server::configured_port();
     let token = std::env::var("PET_TOKEN").ok().filter(|t| !t.is_empty());
     let state = Arc::new(ServerState::new(port, token));
 
     tauri::Builder::default()
+        // Two pets would fight over the port, and the second would exit on the
+        // bind error with the first still running — confusing rather than
+        // wrong. Focusing the existing one is the honest response.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(win) = app.get_webview_window("pet") {
+                let _ = win.show();
+                window::apply_overlay_behaviour(&win);
+            }
+        }))
         .manage(state.clone())
         .invoke_handler(tauri::generate_handler![report_ready, webview_log])
         // `eval` during setup runs against whatever document exists at that
@@ -64,8 +105,23 @@ fn main() {
                 .get_webview_window("pet")
                 .expect("window `pet` missing from tauri.conf.json");
 
+            let saved = settings::load(app.handle());
+            let shared = std::sync::Arc::new(tray::AppState {
+                settings: std::sync::Mutex::new(saved.clone()),
+            });
+            app.manage(shared.clone());
+
             window::apply_overlay_behaviour(&win);
-            place_bottom_right(&win);
+            window::place(
+                &win,
+                saved
+                    .position
+                    .map(|p| window::clamp_to_visible(&win, p))
+                    .unwrap_or_else(|| window::default_corner(&win)),
+            );
+            window::set_click_through(&win, saved.click_through);
+            tray::build(app.handle(), &saved)?;
+            remember_position(&win, app.handle().clone(), shared);
 
             // Spike C harness: render the `sleeping` equivalent so animating
             // and static costs can be measured against the same binary.
@@ -81,7 +137,9 @@ fn main() {
                 "[setup] window url = {:?}",
                 win.url().map(|u| u.to_string())
             );
-            let _ = win.show();
+            if !saved.hidden {
+                let _ = win.show();
+            }
 
             spawn_server(app.handle().clone(), state.clone());
             spawn_drain(app.handle().clone(), state.clone());
@@ -178,18 +236,85 @@ fn spawn_drain(app: tauri::AppHandle, state: Arc<ServerState>) {
     });
 }
 
-/// Park the pet bottom-right of the primary monitor, so it is obviously "on top
-/// of everything" rather than accidentally centred.
-fn place_bottom_right(win: &tauri::WebviewWindow) {
-    if let Ok(Some(monitor)) = win.primary_monitor() {
-        let screen = monitor.size();
-        let scale = monitor.scale_factor();
-        let w = (208.0 * scale) as i32;
-        let h = (232.0 * scale) as i32;
-        let margin = (48.0 * scale) as i32;
-        let _ = win.set_position(PhysicalPosition::new(
-            screen.width as i32 - w - margin,
-            screen.height as i32 - h - margin * 2,
-        ));
+/// Persist the window position after the user drags it.
+///
+/// Written on move rather than on quit: the pet is a background app that people
+/// close by killing, and a position remembered only on a clean exit is a
+/// position usually forgotten.
+fn remember_position(
+    win: &tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    shared: std::sync::Arc<tray::AppState>,
+) {
+    let label = win.label().to_string();
+    win.on_window_event(move |event| {
+        if let tauri::WindowEvent::Moved(pos) = event {
+            let Some(win) = app.get_webview_window(&label) else {
+                return;
+            };
+            let _ = win;
+            let mut settings = shared.settings.lock().expect("settings poisoned");
+            settings.position = Some((pos.x, pos.y));
+            settings::save(&app, &settings);
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hooks_block_is_valid_json_for_the_running_port() {
+        let text = hooks_block(48999);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&text).expect("tray copies this straight into settings.json");
+        let hooks = parsed["hooks"].as_object().expect("a hooks object");
+        assert_eq!(hooks.len(), 11, "spec §5.3 registers eleven events");
+        assert!(
+            text.contains("127.0.0.1:48999"),
+            "must name the port actually in use"
+        );
+        assert!(!text.contains("48200"), "must not leak the default port");
+    }
+
+    #[test]
+    fn only_the_tool_events_carry_a_matcher() {
+        let parsed: serde_json::Value = serde_json::from_str(&hooks_block(48200)).unwrap();
+        let hooks = &parsed["hooks"];
+        assert_eq!(hooks["PreToolUse"][0]["matcher"], ".*");
+        assert!(hooks["Stop"][0]["matcher"].is_null());
+    }
+
+    #[test]
+    fn every_hook_uses_a_short_timeout() {
+        // HTTP hooks are synchronous; the agent waits for us (I2).
+        let parsed: serde_json::Value = serde_json::from_str(&hooks_block(48200)).unwrap();
+        for (event, entries) in parsed["hooks"].as_object().unwrap() {
+            let timeout = entries[0]["hooks"][0]["timeout"].as_u64().unwrap();
+            assert!(timeout <= 2, "{event} would block the agent for {timeout}s");
+        }
+    }
+
+    #[test]
+    fn settings_survive_a_file_that_predates_a_field() {
+        // Adding a setting must not brick an existing install.
+        let old = r#"{"click_through":true}"#;
+        let s: settings::Settings = serde_json::from_str(old).unwrap();
+        assert!(s.click_through);
+        assert!(s.glyphs_enabled, "a new field falls back to its default");
+        assert_eq!(s.scale, 1.0);
+        assert_eq!(s.position, None);
+    }
+
+    #[test]
+    fn settings_round_trip() {
+        let mut s = settings::Settings::default();
+        s.position = Some((10, 20));
+        s.scale = 1.5;
+        let back: settings::Settings =
+            serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back.position, Some((10, 20)));
+        assert_eq!(back.scale, 1.5);
     }
 }

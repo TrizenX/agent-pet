@@ -4,6 +4,7 @@ import { SessionBadge } from "./components/SessionBadge.tsx";
 import { SpeechBubble } from "./components/SpeechBubble.tsx";
 import { StateGlyph } from "./components/StateGlyph.tsx";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
+import { useShellSettings } from "./hooks/useShellSettings.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
 import type { LoadedPack } from "./packs/loader.ts";
 
@@ -33,6 +34,7 @@ export function App() {
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const { snapshot } = useAgentEvents();
   const reducedMotion = usePrefersReducedMotion();
+  const shell = useShellSettings();
 
   useEffect(() => {
     let live = true;
@@ -63,8 +65,8 @@ export function App() {
     <div className="pet-root" data-tauri-drag-region>
       <SpeechBubble state={state} project={snapshot.label} />
       <SessionBadge count={snapshot.liveCount} />
-      <StateGlyph state={state} enabled reducedMotion={reducedMotion} />
-      <Pet pack={pack} state={state} scale={1} reducedMotion={reducedMotion} />
+      <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
+      <Pet pack={pack} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
     </div>
   );
 }
