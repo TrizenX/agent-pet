@@ -32,9 +32,8 @@ function cmdInstall(argv: readonly string[]): number {
   console.log(`installed ${events.length} hook events into ${SETTINGS_PATH}`);
   console.log(`  endpoint: ${ourUrl(port)}`);
   console.log(backup ? `  backup:   ${backup}` : "  backup:   none (file did not exist)");
-  console.log(
-    "\nRemove with: pet-adapter uninstall" + (port === DEFAULT_PORT ? "" : ` --port ${port}`),
-  );
+  const portArg = port === DEFAULT_PORT ? "" : ` --port ${port}`;
+  console.log(`\nRemove with: pet-adapter uninstall${portArg}`);
   return 0;
 }
 

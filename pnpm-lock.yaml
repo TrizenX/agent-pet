@@ -35,6 +35,9 @@ importers:
       '@agent-pet/protocol':
         specifier: workspace:*
         version: link:../protocol
+      xstate:
+        specifier: ^5.32.5
+        version: 5.32.5
 
   packages/protocol: {}
 
@@ -646,6 +649,9 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  xstate@5.32.5:
+    resolution: {integrity: sha512-ULazi1oe6wGrXl0Frb6otSlkm5HLifbbVTkMk5kkSKqz4TkxJaVpnl6jOJwKeid3ORPxYyZQgNLUSYX9q65SIA==}
+
 snapshots:
 
   '@biomejs/biome@2.5.6':
@@ -1127,3 +1133,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  xstate@5.32.5: {}

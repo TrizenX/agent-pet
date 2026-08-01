@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@agent-pet/adapter-claude-code": "workspace:*",
-    "@agent-pet/protocol": "workspace:*"
+    "@agent-pet/protocol": "workspace:*",
+    "xstate": "^5.32.5"
   }
 }

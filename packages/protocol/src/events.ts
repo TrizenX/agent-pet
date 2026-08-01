@@ -41,7 +41,12 @@ export type PetEventBody =
   | { type: "SESSION_END" }
   | { type: "PROMPT_SUBMITTED" }
   | { type: "TOOL_START"; tool: ToolKind; label?: string }
-  | { type: "TOOL_DONE"; ok: boolean; tool: ToolKind }
+  /**
+   * `interrupted` separates a user cancelling a command from the tool
+   * genuinely failing. M0 Spike B found the distinction in the wire data
+   * (`is_interrupt`); without it, pressing ctrl-c makes the pet fall over.
+   */
+  | { type: "TOOL_DONE"; ok: boolean; tool: ToolKind; interrupted?: boolean }
   | { type: "APPROVAL_NEEDED"; tool?: ToolKind; label?: string }
   | { type: "APPROVAL_RESOLVED"; granted: boolean }
   | { type: "AGENT_IDLE" }
