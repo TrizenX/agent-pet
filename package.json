@@ -1,0 +1,27 @@
+{
+  "name": "agent-pet",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:no-agent-strings": "node scripts/lint-no-agent-strings.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && pnpm test",
+    "dev": "pnpm --filter @agent-pet/pet-core dev",
+    "tauri": "pnpm --filter @agent-pet/pet-core tauri"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

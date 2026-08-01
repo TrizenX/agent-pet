@@ -1,0 +1,86 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@agent-pet/adapter-claude-code",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/cli.ts",
+    "./mapping": "./src/mapping.ts",
+    "./tools": "./src/tools.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agent-pet/protocol": "workspace:*"
+  }
+}
