@@ -17,6 +17,7 @@ interface RawHook {
   cwd?: unknown;
   tool_name?: unknown;
   is_error?: unknown;
+  is_interrupt?: unknown;
   notification_type?: unknown;
   reason?: unknown;
   error_type?: unknown;
@@ -61,7 +62,10 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
       // pinned by a drift test in fixtures.test.ts.
       return [{ type: "TOOL_DONE", ok: raw.is_error !== true, tool }];
     case "PostToolUseFailure":
-      return [{ type: "TOOL_DONE", ok: false, tool }];
+      // Spike B: the payload carries `is_interrupt`, which separates "the user
+      // pressed ctrl-c" from "the tool broke". Both are failures for the agent;
+      // only one should make the pet fall over.
+      return [{ type: "TOOL_DONE", ok: false, tool, interrupted: raw.is_interrupt === true }];
 
     case "PermissionRequest":
       return [{ type: "APPROVAL_NEEDED", tool }];

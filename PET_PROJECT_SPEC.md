@@ -389,7 +389,8 @@ Per-state:
 
 | From | Event / timer | To |
 | :-- | :-- | :-- |
-| `working.*` | `TOOL_DONE(ok:false)` | `error` |
+| `working.*` | `TOOL_DONE(ok:false, interrupted:false)` | `error` |
+| `working.*` | `TOOL_DONE(ok:false, interrupted:true)` | `idle` — a cancelled command is not the tool breaking (Spike B · B3) |
 | `working.*` | `TOOL_DONE(ok:true)` | stay, play a one-shot "hop" overlay |
 | `waiting_approval` | `APPROVAL_RESOLVED(granted:true)` \| `TOOL_START` | `working.*` |
 | `waiting_approval` | `APPROVAL_RESOLVED(granted:false)` | `idle` |
@@ -399,11 +400,19 @@ Per-state:
 | `error` | `after 3 s` | `idle` |
 | `exhausted` | `PROMPT_SUBMITTED` \| `TOOL_START` \| `after 10 min` | `idle` |
 | `idle` | `after 90 s` | `sleeping` |
-| **any non-`sleeping`** | **`after 5 min` with no event (watchdog)** | `idle`, then `sleeping` |
+| `attentive`, `working.*` | `after 5 min` | `idle` — **added during TZX-67**; both were left without a decay path, and the watchdog alone does not satisfy I4 |
+| `waiting_approval` | `after 30 min` | `idle` — **added during TZX-67**; §7.2 gave it no decay at all |
+| **any non-`sleeping`** | **`after 5 min` with no event (watchdog)** | `idle`, then `sleeping` — **except `waiting_approval` and `exhausted`** |
 
 `TOOL_START` mapping: `bash → digging`, `file_edit → typing`, `file_read | search → reading`, everything else → `generic`.
 
 The watchdog is the I4 backstop: even if the per-state timers are wrong, nothing survives five silent minutes.
+
+**Two refinements from implementing this (TZX-67).**
+
+*Per-state decay is required in addition to the watchdog, not instead of it.* `attentive` and `working.*` originally had neither, which left them dependent on the host's watchdog timer still running. A "no state is terminal" test caught it: with the host timer stopped, a prompt that never produced a tool call wedged the pet in `attentive` forever. I4 says *decay path **plus** watchdog*, and it means it.
+
+*The watchdog must not sweep the attention states.* `waiting_approval` and `exhausted` are the pet asking the user for something, and silence there is the expected condition — the user has stepped away. Clearing them after five quiet minutes would hide the request exactly when the user most needs to see it on return. They are exempt from the watchdog and carry their own, much longer, decays instead.
 
 ### 7.3 `celebrationWorthy`
 
