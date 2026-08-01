@@ -6,7 +6,7 @@ import {
   type PetEvent,
   type PetEventBody,
 } from "@agent-pet/protocol";
-import { classifyTool } from "./tools.js";
+import { classifyTool } from "./tools.ts";
 
 export const ADAPTER_ID = "claude-code";
 
@@ -55,6 +55,10 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
     case "PreToolUse":
       return [{ type: "TOOL_START", tool }];
     case "PostToolUse":
+      // Spike B: `is_error` is documented but was never present in any recorded
+      // payload — real failures arrive as `PostToolUseFailure` instead. Kept as
+      // a defensive read so a future schema that does set it still works, and
+      // pinned by a drift test in fixtures.test.ts.
       return [{ type: "TOOL_DONE", ok: raw.is_error !== true, tool }];
     case "PostToolUseFailure":
       return [{ type: "TOOL_DONE", ok: false, tool }];

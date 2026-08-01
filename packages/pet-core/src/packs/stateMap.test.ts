@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ATLAS_ROWS } from "./atlas.js";
+import { ATLAS_ROWS } from "./atlas.ts";
 import {
   type PetState,
   REQUIRED_ROWS,
   rowIndexForState,
   STATE_ANIMATIONS,
   STATE_GLYPHS,
-} from "./stateMap.js";
+} from "./stateMap.ts";
 
 const ALL_STATES = Object.keys(STATE_ANIMATIONS) as PetState[];
 

@@ -1,2 +1,2 @@
-export * from "./adapter.js";
-export * from "./events.js";
+export * from "./adapter.ts";
+export * from "./events.ts";

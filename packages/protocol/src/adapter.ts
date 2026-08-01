@@ -1,4 +1,4 @@
-import type { PetEvent } from "./events.js";
+import type { PetEvent } from "./events.ts";
 
 export interface AdapterContext {
   /** Epoch ms stamped by the receiver. Passed in so adapters stay pure. */

@@ -1,0 +1,29 @@
+{
+  "session_id": "session-0000",
+  "transcript_path": "/home/user/.agent/transcript.jsonl",
+  "cwd": "/home/user/demo-project",
+  "prompt_id": "prompt-0000",
+  "permission_mode": "acceptEdits",
+  "effort": {
+    "level": "<redacted:string:4>"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "<redacted:string:70>",
+    "description": "<redacted:string:50>"
+  },
+  "permission_suggestions": [
+    {
+      "type": "<redacted:string:8>",
+      "rules": [
+        {
+          "toolName": "<redacted:string:4>",
+          "ruleContent": "<redacted:string:70>"
+        }
+      ],
+      "behavior": "<redacted:string:5>",
+      "destination": "<redacted:string:13>"
+    }
+  ]
+}

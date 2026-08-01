@@ -9,7 +9,7 @@ import {
   measureFrameCounts,
   ROW_INDEX,
   USABLE_ROWS,
-} from "./atlas.js";
+} from "./atlas.ts";
 
 /** Builds a synthetic sheet with the given live-frame count per row (Spike D · F2). */
 function makeSheet(rows: number, frameCounts: readonly number[], scale = 1): ImageData {

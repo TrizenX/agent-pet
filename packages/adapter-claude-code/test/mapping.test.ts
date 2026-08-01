@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { claudeCodeAdapter } from "../src/mapping.js";
-import { classifyTool } from "../src/tools.js";
+import { claudeCodeAdapter } from "../src/mapping.ts";
+import { classifyTool } from "../src/tools.ts";
 
 const CTX = { receivedAt: 1_700_000_000_000 };
 const BASE = { session_id: "s1", cwd: "/Users/x/Project/acme-api" };
