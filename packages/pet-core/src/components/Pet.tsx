@@ -7,8 +7,10 @@ import { type PetState, STATE_ANIMATIONS } from "../packs/stateMap.ts";
  * One frame of the atlas, stepped with CSS.
  *
  * Frames advance by moving `background-position-x` under a `steps()` timing
- * function, which is the cheapest way to animate a sprite sheet — Spike C
- * measured the whole app at 0.2 % of one core doing it.
+ * function. Measured at 1.399 % of one core with the real 1536 × 1872 atlas
+ * (M1 acceptance) — up from 0.2 % with the placeholder rectangle Spike C used,
+ * which is the honest price of stepping a real sheet and still small enough
+ * not to be the thing to optimise.
  */
 
 const BASE_FPS = 8;

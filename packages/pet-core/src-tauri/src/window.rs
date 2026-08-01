@@ -140,7 +140,6 @@ mod macos {
 
             let _: () = msg_send![ns_window, setCollectionBehavior: behaviour];
             let _: () = msg_send![ns_window, setLevel: level];
-            let _: () = msg_send![ns_window, setIgnoresMouseEvents: false];
 
             // Required, and easy to miss. With `focus: false` the app never
             // activates, and an unactivated app's windows are never ordered
@@ -270,8 +269,31 @@ pub fn place(win: &WebviewWindow, at: (i32, i32)) {
 /// While this is on the pet cannot be dragged, which is why the tray item says
 /// so and why the tray is always the way back. Leaving a user with a window
 /// they can neither click nor move would be unrecoverable without quitting.
+///
+/// Deliberately not folded into `apply_overlay_behaviour`: that function runs
+/// on every show, and setting the flag there silently reset the user's choice
+/// each time the pet was hidden and shown again.
 pub fn set_click_through(win: &WebviewWindow, on: bool) {
     if let Err(e) = win.set_ignore_cursor_events(on) {
         eprintln!("[window] click-through toggle failed: {e}");
     }
+}
+
+/// Show the pet, correctly.
+///
+/// Three things have to happen together and used to be three separate call
+/// sites that each remembered a different subset:
+///
+///   * `show()`, obviously;
+///   * re-assert the overlay behaviour, because a window hidden across a Space
+///     change comes back as an ordinary one and quietly undoes Spike A;
+///   * re-apply click-through, because it is a window flag and showing does not
+///     preserve the user's choice.
+///
+/// Callers that forgot the third silently turned click-through off every time
+/// the pet was hidden and shown again.
+pub fn show(win: &WebviewWindow, click_through: bool) {
+    let _ = win.show();
+    apply_overlay_behaviour(win);
+    set_click_through(win, click_through);
 }

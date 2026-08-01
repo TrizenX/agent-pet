@@ -2,15 +2,25 @@
 /**
  * Enforces invariant I5: pet-core contains zero hardcoded agent knowledge.
  *
- * Exactly one file — src/adapters/registry.ts — may name an adapter. Anything
- * else mentioning an agent, a tool name, or a hook event name means Phase 2
- * has stopped being a pure addition.
+ * One file may name an adapter — src/adapters/registry.ts — plus the one test
+ * that proves the registry wires it. Anything else mentioning an agent, a tool
+ * name, or a hook event name means Phase 2 has stopped being a pure addition.
+ *
+ * Scans the Rust shell as well as the TypeScript. It did not, once, and a code
+ * review found the shell generating hook configuration with all eleven event
+ * names in it.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const SCAN = join(ROOT, "packages/pet-core/src");
+// Both halves of pet-core. The Rust shell was exempt until a code review found
+// eleven hook event names and an agent id sitting in it, invisible to this
+// check — the gap in the enforcement was worse than the violation.
+const SCAN_ROOTS = [
+  { dir: join(ROOT, "packages/pet-core/src"), label: "packages/pet-core/src" },
+  { dir: join(ROOT, "packages/pet-core/src-tauri/src"), label: "packages/pet-core/src-tauri/src" },
+];
 const ALLOWED = new Set([
   "adapters/registry.ts",
   // Proving the registry actually wires an adapter means naming one. Same
@@ -37,26 +47,28 @@ function* walk(dir) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) yield* walk(full);
-    else if (/\.(ts|tsx)$/.test(name)) yield full;
+    else if (/\.(ts|tsx|rs)$/.test(name)) yield full;
   }
 }
 
 let failures = 0;
-for (const file of walk(SCAN)) {
-  const rel = relative(SCAN, file).split(sep).join("/");
-  if (ALLOWED.has(rel)) continue;
+for (const root of SCAN_ROOTS) {
+  for (const file of walk(root.dir)) {
+    const rel = relative(root.dir, file).split(sep).join("/");
+    if (ALLOWED.has(rel)) continue;
 
-  const lines = readFileSync(file, "utf8").split("\n");
-  lines.forEach((line, i) => {
-    for (const { pattern, label } of FORBIDDEN) {
-      if (pattern.test(line)) {
-        console.error(
-          `I5 violation  packages/pet-core/src/${rel}:${i + 1}  (${label})\n    ${line.trim()}`,
-        );
-        failures++;
+    const lines = readFileSync(file, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      for (const { pattern, label } of FORBIDDEN) {
+        if (pattern.test(line)) {
+          console.error(
+            `I5 violation  ${root.label}/${rel}:${i + 1}  (${label})\n    ${line.trim()}`,
+          );
+          failures++;
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 if (failures > 0) {

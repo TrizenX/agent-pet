@@ -10,7 +10,6 @@ use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-use crate::server::ServerState;
 use crate::settings::{self, Settings};
 use crate::window;
 
@@ -155,10 +154,7 @@ fn on_menu(app: &AppHandle, id: &str) {
                 if settings.hidden {
                     let _ = win.hide();
                 } else {
-                    let _ = win.show();
-                    // Re-assert overlay behaviour: a window that was hidden
-                    // across a Space change comes back as an ordinary one.
-                    window::apply_overlay_behaviour(&win);
+                    window::show(&win, settings.click_through);
                 }
             }
         }
@@ -176,9 +172,10 @@ fn on_menu(app: &AppHandle, id: &str) {
         }
 
         "copy-hooks" => {
-            let port = app.state::<Arc<ServerState>>().port;
-            println!("{}", crate::hooks_block(port));
-            let _ = app.emit("copy-hooks", crate::hooks_block(port));
+            // Asks the frontend, which owns the adapter and therefore the only
+            // thing that knows what a hook config looks like (I5). The shell
+            // writes the clipboard; it does not compose the text.
+            let _ = app.emit("copy-hooks", ());
         }
 
         "event-log" => {

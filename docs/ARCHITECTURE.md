@@ -4,7 +4,8 @@
 
 ```
 Claude Code ──HTTP hook──▶ POST /event/claude-code          raw agent payload
-                              │  guard.rs: ≤8 KB, no Origin, loopback only
+                              │  guard.rs: no Origin, optional token
+                              │  server.rs: loopback bind, ≤1 MB body limit
                               │  ── 204 No Content, immediately ──▶ agent continues
                               ▼
                            bounded channel (never blocks the response)

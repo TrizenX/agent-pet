@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import { claudeCodeAdapter } from "../src/mapping.ts";
 import { hooksBlock } from "../src/record.ts";
 import { installHooks, ourUrl, uninstallHooks } from "../src/settings.ts";
 
@@ -174,5 +175,39 @@ describe("hooksBlock", () => {
     const b = hooksBlock(PORT) as Record<string, { matcher?: string }[]>;
     expect(b.PreToolUse?.[0]?.matcher).toBe(".*");
     expect(b.Stop?.[0]?.matcher).toBeUndefined();
+  });
+});
+
+describe("hookConfig — what the tray puts on the clipboard", () => {
+  it("names the endpoint it was given, and only that", () => {
+    const text = claudeCodeAdapter.hookConfig?.("http://127.0.0.1:48999/event/claude-code") ?? "";
+    expect(text).toContain("48999");
+    expect(text).not.toContain("48200");
+  });
+
+  it("is valid JSON covering the eleven events in §5.3", () => {
+    const parsed = JSON.parse(claudeCodeAdapter.hookConfig?.("http://x/e") ?? "{}");
+    expect(Object.keys(parsed.hooks)).toHaveLength(11);
+  });
+
+  it("matches the plugin block this repo ships", () => {
+    // Two copies of the same configuration would drift; this is the tripwire.
+    const generated = JSON.parse(claudeCodeAdapter.hookConfig?.(ourUrl(48200)) ?? "{}");
+    const shipped = JSON.parse(
+      readFileSync(new URL("../plugin/hooks/hooks.json", import.meta.url), "utf8"),
+    );
+    expect(Object.keys(generated.hooks).sort()).toEqual(Object.keys(shipped.hooks).sort());
+    for (const event of Object.keys(shipped.hooks)) {
+      expect(generated.hooks[event], event).toEqual(shipped.hooks[event]);
+    }
+  });
+
+  it("keeps every timeout short — HTTP hooks are synchronous (I2)", () => {
+    const parsed = JSON.parse(claudeCodeAdapter.hookConfig?.("http://x/e") ?? "{}");
+    for (const [event, entries] of Object.entries(parsed.hooks)) {
+      for (const entry of entries as { hooks: { timeout: number }[] }[]) {
+        expect(entry.hooks[0]?.timeout, event).toBeLessThanOrEqual(2);
+      }
+    }
   });
 });

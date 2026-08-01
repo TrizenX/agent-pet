@@ -11,9 +11,12 @@
  * **I4 — no state is terminal.** Every non-`sleeping` state has a decay path,
  * and a watchdog catches anything a missed hook leaves behind.
  *
- * **I6 — idle cost is zero.** The machine holds no clock. Elapsed time is read
- * from the `at` field every event already carries, which also makes every
- * timing rule testable without faking a clock.
+ * **I6 — idle cost is zero.** The watchdog holds no clock: staleness is read
+ * from the `at` field every event already carries, so the host decides when to
+ * check and nothing ticks while the pet is asleep. The per-state decays are
+ * xstate `after:` transitions and *do* use real timers, which is why their
+ * tests fake the clock — worth knowing before assuming this file is
+ * timer-free.
  */
 
 import type { PetEvent } from "@agent-pet/protocol";
