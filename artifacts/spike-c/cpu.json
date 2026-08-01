@@ -1,0 +1,39 @@
+{
+  "results": [
+    {
+      "mode": "animating",
+      "static": false,
+      "pids": 5,
+      "processes": [
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+        "packages/pet-core/src-tauri/target/debug/agent-pet"
+      ],
+      "wall_seconds": 120.0,
+      "cpu_seconds": 0.24,
+      "cpu_percent_of_one_core": 0.2,
+      "rss_start_mb": 274.6,
+      "rss_end_mb": 267.7,
+      "rss_growth_mb": -6.91
+    },
+    {
+      "mode": "static (sleeping)",
+      "static": true,
+      "pids": 5,
+      "processes": [
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+        "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+        "packages/pet-core/src-tauri/target/debug/agent-pet"
+      ],
+      "wall_seconds": 120.0,
+      "cpu_seconds": 0.05,
+      "cpu_percent_of_one_core": 0.042,
+      "rss_start_mb": 275.0,
+      "rss_end_mb": 274.8,
+      "rss_growth_mb": -0.27
+    }
+  ],
+  "i6_pass": true
+}

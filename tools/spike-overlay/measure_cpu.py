@@ -62,22 +62,38 @@ def pids_for(root_pid: int, binary_name: str) -> dict[int, str]:
     return found
 
 
+def parse_cputime(field: str) -> float:
+    """macOS `ps -o cputime` prints [[HH:]MM:]SS.ss, not plain seconds."""
+    parts = field.strip().split(":")
+    try:
+        nums = [float(x) for x in parts]
+    except ValueError:
+        raise ValueError(f"unparseable cputime {field!r}")
+    seconds = 0.0
+    for n in nums:
+        seconds = seconds * 60 + n
+    return seconds
+
+
 def cpu_seconds(pids) -> float:
-    """Cumulative CPU seconds across the given pids."""
+    """
+    Cumulative CPU seconds across the given pids.
+
+    Uses `cputime`, not `cputimes`: the latter is a Linux keyword that macOS ps
+    rejects outright. The first version of this script used it, ps wrote its
+    error to stderr, and the parser silently returned 0.0 — producing a
+    confident 0.000% for an animating window. Hence the sanity check in main().
+    """
     if not pids:
         return 0.0
-    out = subprocess.run(
-        ["ps", "-o", "cputimes=", "-p", ",".join(str(p) for p in pids)],
+    proc = subprocess.run(
+        ["ps", "-o", "cputime=", "-p", ",".join(str(p) for p in pids)],
         capture_output=True,
         text=True,
-    ).stdout
-    total = 0.0
-    for line in out.split():
-        try:
-            total += float(line)
-        except ValueError:
-            pass
-    return total
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise RuntimeError(f"ps failed: {proc.stderr.strip() or 'no output'}")
+    return sum(parse_cputime(line) for line in proc.stdout.splitlines() if line.strip())
 
 
 def rss_kb(pids) -> int:
@@ -150,6 +166,16 @@ def main() -> int:
         )
 
     animating, static = results[0], results[1]
+
+    # A probe that cannot detect anything must not be allowed to report success.
+    # An animating webview consuming exactly zero CPU means the measurement is
+    # broken, not that the animation is free.
+    if animating["cpu_seconds"] <= 0.0:
+        print("\nMEASUREMENT INVALID: the animating case consumed 0.00s of CPU.")
+        print("That is not plausible; the probe is not reading CPU time. Fix it before")
+        print("believing any verdict below.")
+        return 2
+
     print("\n--- I6: while sleeping, no animation and no repaints ---")
     verdict_ok = static["cpu_percent_of_one_core"] < 0.5
     print(
