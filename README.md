@@ -15,6 +15,17 @@ A desktop pet that is the embodiment of a running AI coding agent. It digs while
 | `packages/pet-core/src/packs` | ✅ | Atlas geometry and the state → animation-row map, both derived empirically in Spike D. |
 | `packages/pet-core` (rest) | ⏳ M1 | Tauri shell, HTTP server, xstate machine, renderer, tray. |
 
+## Platforms
+
+| | |
+| :-- | :-- |
+| **macOS**, **Windows** | Phase 1 targets. |
+| **Linux · X11** | Best-effort. |
+| **Linux · Wayland** | Likely unsupported — Wayland gives a client no way to position its own window or force always-on-top. Being settled by a spike; no support is claimed until it is. |
+| **iOS / Android** | Out of scope, and not for the obvious reason: the agent runs on your desktop, so a phone cannot receive its hooks at all. The honest mobile shape is a remote notifier over the Phase 3 protocol, not an overlay pet. |
+
+Everything shipped so far is pure TypeScript with no OS assumptions — the platform surface is entirely in the Tauri shell, which is still M1 work. See spec §3.1.
+
 ## Read this first
 
 - **[`PET_PROJECT_SPEC.md`](PET_PROJECT_SPEC.md)** — the single source of truth. §2 lists the hard invariants; §13 lists decisions that are already closed.
