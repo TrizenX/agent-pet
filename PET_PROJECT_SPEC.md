@@ -454,6 +454,8 @@ interface SessionState {
 
 Every `PetEvent` is routed to its own session's machine actor. Sessions with no event for 10 minutes are evicted (synthesising `SESSION_END`). Eviction is what keeps memory flat over a workday (M2 criterion).
 
+**A session is never evicted while it is asking the user for something** (added in TZX-68, same reasoning as the watchdog exemption in §7.2). The user going to lunch with an approval on screen is the normal case, and dropping it would erase the request exactly when they are away from the machine. This cannot leak: the machine decays `waiting_approval` and `exhausted` on its own, after which the ordinary rule applies immediately — so the worst case is one extra decay period, not an unbounded session.
+
 ### 8.2 Focus policy
 
 The single visible pet renders **one** focused session, chosen in strict order:
