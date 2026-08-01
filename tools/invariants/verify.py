@@ -130,18 +130,27 @@ def latency_samples(port: int, n: int, timeout: float = 5.0) -> list[float]:
 
 
 def check_i2_running(port: int) -> Check:
-    on = latency_samples(port, 200)
+    requested = 200
+    on = latency_samples(port, requested)
     median = statistics.median(on) if on else float("inf")
     p99 = statistics.quantiles(on, n=100)[98] if len(on) > 10 else median
-    # A hook is an HTTP round trip on loopback. Anything past a millisecond
-    # means the handler is doing work it should not be.
-    ok = median < 1.0
+
+    # A median over the handful of requests that happened to survive is not a
+    # median. A partially wedged pet could answer five of two hundred quickly
+    # and score better than a healthy one, which is the wrong way round.
+    delivered = len(on) / requested
+    ok = median < 1.0 and delivered >= 0.99
+
+    detail = f"median {median:.3f} ms, p99 {p99:.3f} ms over {len(on)}/{requested} requests"
+    if delivered < 0.99:
+        detail += f" — only {delivered:.0%} answered, so the median is not representative"
     return Check(
         "a hook round-trip costs well under a millisecond",
         "I2",
         ok,
-        f"median {median:.3f} ms, p99 {p99:.3f} ms over {len(on)} requests",
-        {"median_ms": round(median, 4), "p99_ms": round(p99, 4), "n": len(on)},
+        detail,
+        {"median_ms": round(median, 4), "p99_ms": round(p99, 4),
+         "n": len(on), "requested": requested},
     )
 
 
@@ -192,13 +201,18 @@ def check_i2_hung(port: int, binary: Path) -> Check:
         waited = (time.perf_counter() - t) * 1000
         os.kill(proc.pid, signal.SIGCONT)
 
-        # The client's own timeout stands in for the hook's `timeout: 2`.
+        # This is our client's timeout, not the agent's hook runner. It is set
+        # slightly above the hook's declared `timeout: 2` so the measurement
+        # shows the pet does not respond at all while hung — the real hook
+        # would give up ~500 ms sooner. What is proven here is that the wait is
+        # bounded by a timeout rather than by the pet, not the exact bound.
         ok = waited <= 2_600
         return Check(
             "a hung pet still bounds the agent's wait",
             "I2",
             ok,
-            f"agent waited {waited:.0f} ms before the hook timeout would fire",
+            f"no response for {waited:.0f} ms (our 2.5 s client timeout; the hook's "
+            f"own 2 s would fire sooner)",
             {"waited_ms": round(waited)},
         )
     finally:
@@ -228,11 +242,16 @@ def check_browser_lockout(port: int) -> Check:
 
 # --------------------------------------------------------------------------- I6
 
+# WebKit helpers that were already running before the pet started. Anything in
+# here belongs to some other app and must not be charged to us.
+PREEXISTING_WEBKIT: set[int] = set()
+
+
 def process_tree(root_pid: int) -> dict[int, str]:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spike-overlay"))
     from measure_cpu import pids_for  # noqa: E402
 
-    return pids_for(root_pid, "agent-pet")
+    return pids_for(root_pid, "agent-pet", PREEXISTING_WEBKIT)
 
 
 def cpu_and_rss(pids) -> tuple[float, float]:
@@ -242,8 +261,18 @@ def cpu_and_rss(pids) -> tuple[float, float]:
     return cpu_seconds(pids), rss_kb(pids) / 1024
 
 
-def check_i6(root_pid: int, seconds: float) -> Check:
+def check_i6(root_pid: int, seconds: float, settle: float = 15.0) -> Check:
+    """
+    Idle cost, measured on a pet nothing has been sent to.
+
+    This has to run *before* the load checks, not after. Placed last, it caught
+    the app unwinding from 241 events — RSS falling ~90 MB across a window
+    labelled "idle" and CPU reading 2 % against an isolated truth of 0.1 %.
+    Recovery-after-load is a real thing to measure, but it is not this thing,
+    and calling it idle made the number wrong by twentyfold.
+    """
     pids = process_tree(root_pid)
+    time.sleep(settle)
     c0, r0 = cpu_and_rss(pids)
     t0 = time.time()
     time.sleep(seconds)
@@ -254,7 +283,8 @@ def check_i6(root_pid: int, seconds: float) -> Check:
         "an idle pet costs approximately nothing",
         "I6",
         ok,
-        f"{pct:.3f} % of one core over {seconds:.0f} s, RSS {r0:.0f} -> {r1:.0f} MB",
+        f"{pct:.3f} % of one core over {seconds:.0f} s "
+        f"(after {settle:.0f} s settling), RSS {r0:.0f} -> {r1:.0f} MB",
         {"cpu_percent": round(pct, 4), "rss_start_mb": round(r0), "rss_end_mb": round(r1)},
     )
 
@@ -262,6 +292,16 @@ def check_i6(root_pid: int, seconds: float) -> Check:
 # ------------------------------------------------------------------- multi-session
 
 def check_multi_session(port: int) -> Check:
+    """
+    Not "are there two sessions?" — that passes trivially, because the checks
+    before this one already created sessions of their own and nothing evicts
+    them for ten minutes. It passed even when the harness was posting to a
+    source no adapter claimed.
+
+    The reviewable claim is the focus policy: an approval outranks a session
+    that is more recently active, and the pet names that session's project.
+    """
+    before = (health(port) or {}).get("webview", {}).get("sessions", 0)
     now = int(time.time() * 1000)
     post(port, f"/event/{SOURCE}", json.dumps({
         "hook_event_name": "PermissionRequest", "session_id": "ms-a",
@@ -276,18 +316,31 @@ def check_multi_session(port: int) -> Check:
     time.sleep(1.5)
 
     h = health(port) or {}
-    sessions = h.get("webview", {}).get("sessions", 0)
-    received = h.get("events", {}).get("received", 0)
-    ok = sessions >= 2
-    detail = f"{sessions} live session(s) after interleaving two"
-    if not ok and received > 0:
-        detail += f" — {received} events reached the shell, so they are being dropped downstream"
+    w = h.get("webview", {})
+    sessions = w.get("sessions", 0)
+    state = w.get("focusedState", "")
+    project = w.get("focusedProject", "")
+
+    grew = sessions >= before + 2
+    # ms-b posted 40 events after ms-a's approval, so recency alone would show
+    # other-repo. Showing acme-api is the policy working.
+    correct_focus = state == "waiting_approval" and project == "acme-api"
+    ok = grew and correct_focus
+
+    detail = (
+        f"{before} -> {sessions} sessions; focus is {state or '(none)'} "
+        f"on {project or '(none)'}"
+    )
+    if not grew:
+        detail += " — the two new sessions were not created"
+    elif not correct_focus:
+        detail += " — recency beat the approval, which is the bug §8 exists to prevent"
     return Check(
-        "concurrent sessions are tracked separately",
+        "an approval outranks a more recently active session",
         "§8",
         ok,
         detail,
-        {"sessions": sessions, "received": received, "since": now},
+        {"before": before, "after": sessions, "state": state, "project": project, "since": now},
     )
 
 
@@ -330,17 +383,27 @@ def soak(port: int, root_pid: int, minutes: float) -> Check:
     hours = minutes / 60
     per_hour = growth / hours if hours else growth
 
-    # A real leak on a 350 MB baseline shows up as tens of MB an hour. Anything
-    # under 10 MB/h is inside the noise of a garbage-collected runtime.
-    ok = per_hour < 10.0
+    # `< 10.0` is not a flatness check, it is a not-growing check, and a
+    # review caught it passing a -738 MB/h decline as "flat". Growth is the
+    # thing that matters, so it stays tightly bounded; a large decline is not a
+    # failure but it does mean the run never reached steady state, and saying
+    # so is more useful than a green tick.
+    growing = per_hour > 10.0
+    settling = per_hour < -20.0
+    ok = not growing
+    verdict = (
+        "still settling — not a steady-state measurement"
+        if settling
+        else "flat" if abs(per_hour) <= 10.0 else "growing"
+    )
     return Check(
-        "memory stays flat over a long run",
+        "memory does not grow over a long run",
         "M2 soak",
         ok,
-        f"{first:.0f} -> {last:.0f} MB over {minutes:.0f} min ({per_hour:+.1f} MB/h), "
+        f"{first:.0f} -> {last:.0f} MB over {minutes:.0f} min ({per_hour:+.1f} MB/h) — {verdict}, "
         f"{session} sessions",
         {"first_mb": round(first), "last_mb": round(last),
-         "mb_per_hour": round(per_hour, 2), "sessions": session,
+         "mb_per_hour": round(per_hour, 2), "verdict": verdict, "sessions": session,
          "minutes": minutes, "samples": len(samples)},
     )
 
@@ -360,6 +423,14 @@ def main() -> int:
     if health(args.port):
         print(f"Something is already listening on {args.port}. Stop it first.")
         return 2
+
+    # Snapshot before launching: every WebKit helper alive now belongs to
+    # something else, and charging a busy browser to the pet turned a 0.1 %
+    # idle measurement into 12 %.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spike-overlay"))
+    from measure_cpu import webkit_pids  # noqa: E402
+
+    PREEXISTING_WEBKIT.update(webkit_pids())
 
     proc = subprocess.Popen([str(args.binary)], env=dict(os.environ),
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -404,14 +475,21 @@ def main() -> int:
         SOURCE = adapters[0]
 
         print(f"pet is up, webview connected, adapter `{SOURCE}`\n")
+
+        # Idle first, while nothing has been sent to the pet. Order is
+        # load-bearing: run last, this measured the app unwinding from 241
+        # events and read 2 % against an isolated truth of 0.1 %, then read
+        # 0.044 % on the next run purely because the collector happened to be
+        # quiet. A measurement that swings twentyfold on scheduling luck is not
+        # a measurement.
+        c = check_i6(proc.pid, args.idle_seconds)
+        checks.append(c)
+        print(f"[{'PASS' if c.passed else 'FAIL'}] {c.invariant:6} {c.name}\n         {c.detail}")
+
         for fn in (check_i1, check_browser_lockout, check_i2_running, check_multi_session):
             c = fn(args.port)
             checks.append(c)
             print(f"[{'PASS' if c.passed else 'FAIL'}] {c.invariant:6} {c.name}\n         {c.detail}")
-
-        c = check_i6(proc.pid, args.idle_seconds)
-        checks.append(c)
-        print(f"[{'PASS' if c.passed else 'FAIL'}] {c.invariant:6} {c.name}\n         {c.detail}")
 
         if args.soak_minutes > 0:
             print(f"\nsoaking for {args.soak_minutes:g} min...")

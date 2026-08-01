@@ -1,5 +1,16 @@
 [
   {
+    "name": "an idle pet costs approximately nothing",
+    "invariant": "I6",
+    "passed": true,
+    "detail": "0.022 % of one core over 45 s (after 15 s settling), RSS 278 -> 278 MB",
+    "data": {
+      "cpu_percent": 0.0222,
+      "rss_start_mb": 278,
+      "rss_end_mb": 278
+    }
+  },
+  {
     "name": "every hook response is 204 with an empty body",
     "invariant": "I1",
     "passed": true,
@@ -19,65 +30,58 @@
     "name": "a hook round-trip costs well under a millisecond",
     "invariant": "I2",
     "passed": true,
-    "detail": "median 0.202 ms, p99 0.439 ms over 200 requests",
+    "detail": "median 0.164 ms, p99 0.439 ms over 200/200 requests",
     "data": {
-      "median_ms": 0.2024,
+      "median_ms": 0.164,
       "p99_ms": 0.439,
-      "n": 200
+      "n": 200,
+      "requested": 200
     }
   },
   {
-    "name": "concurrent sessions are tracked separately",
+    "name": "an approval outranks a more recently active session",
     "invariant": "\u00a78",
     "passed": true,
-    "detail": "4 live session(s) after interleaving two",
+    "detail": "2 -> 4 sessions; focus is waiting_approval on acme-api",
     "data": {
-      "sessions": 4,
-      "received": 249,
-      "since": 1785604911615
+      "before": 2,
+      "after": 4,
+      "state": "waiting_approval",
+      "project": "acme-api",
+      "since": 1785611089079
     }
   },
   {
-    "name": "an idle pet costs approximately nothing",
-    "invariant": "I6",
-    "passed": true,
-    "detail": "0.200 % of one core over 45 s, RSS 416 -> 371 MB",
-    "data": {
-      "cpu_percent": 0.1998,
-      "rss_start_mb": 416,
-      "rss_end_mb": 371
-    }
-  },
-  {
-    "name": "memory stays flat over a long run",
+    "name": "memory does not grow over a long run",
     "invariant": "M2 soak",
     "passed": true,
-    "detail": "378 -> 255 MB over 10 min (-737.8 MB/h), 119 sessions",
+    "detail": "330 -> 263 MB over 6 min (-671.7 MB/h) \u2014 still settling \u2014 not a steady-state measurement, 72 sessions",
     "data": {
-      "first_mb": 378,
-      "last_mb": 255,
-      "mb_per_hour": -737.82,
-      "sessions": 119,
-      "minutes": 10.0,
-      "samples": 119
+      "first_mb": 330,
+      "last_mb": 263,
+      "mb_per_hour": -671.69,
+      "verdict": "still settling \u2014 not a steady-state measurement",
+      "sessions": 72,
+      "minutes": 6.0,
+      "samples": 72
     }
   },
   {
     "name": "a stopped pet costs the agent nothing",
     "invariant": "I2",
     "passed": true,
-    "detail": "0.106 ms per refused connection",
+    "detail": "0.113 ms per refused connection",
     "data": {
-      "per_request_ms": 0.1062
+      "per_request_ms": 0.1132
     }
   },
   {
     "name": "a hung pet still bounds the agent's wait",
     "invariant": "I2",
     "passed": true,
-    "detail": "agent waited 2502 ms before the hook timeout would fire",
+    "detail": "no response for 2503 ms (our 2.5 s client timeout; the hook's own 2 s would fire sooner)",
     "data": {
-      "waited_ms": 2502
+      "waited_ms": 2503
     }
   }
 ]

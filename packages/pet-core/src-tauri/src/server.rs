@@ -50,6 +50,13 @@ pub struct WebviewReport {
     pub connected: bool,
     pub adapters: Vec<String>,
     pub sessions: usize,
+    /// What the pet is currently drawing, and for which project.
+    ///
+    /// Exposed because a session *count* cannot verify the focus policy: a
+    /// harness asking "are there two sessions?" passes even if both collapsed
+    /// into one wrong state. The reviewable claim is which one won.
+    pub focused_state: String,
+    pub focused_project: String,
 }
 
 pub struct ServerState {
@@ -160,6 +167,8 @@ async fn health(State(state): State<SharedState>) -> impl IntoResponse {
             "connected": report.connected,
             "adapters": report.adapters,
             "sessions": report.sessions,
+            "focusedState": report.focused_state,
+            "focusedProject": report.focused_project,
         },
         "authRequired": state.token.is_some(),
     }))
@@ -362,6 +371,8 @@ mod tests {
             connected: true,
             adapters: vec!["some-agent".into()],
             sessions: 2,
+            focused_state: "waiting_approval".into(),
+            focused_project: "acme-api".into(),
         });
 
         let req = Request::builder()

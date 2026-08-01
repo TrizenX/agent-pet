@@ -34,8 +34,28 @@ from pathlib import Path
 HELPER_HINTS = ("WebKit.WebContent", "WebKit.Networking", "WebKit.GPU")
 
 
-def pids_for(root_pid: int, binary_name: str) -> dict[int, str]:
-    """Our process, its descendants, and the WebKit helpers it is using."""
+def webkit_pids() -> set[int]:
+    """Every WebKit helper on the machine right now."""
+    out = subprocess.run(["ps", "-Ao", "pid=,comm="], capture_output=True, text=True).stdout
+    found = set()
+    for line in out.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2 and any(h in parts[1] for h in HELPER_HINTS):
+            found.add(int(parts[0]))
+    return found
+
+
+def pids_for(root_pid: int, binary_name: str, preexisting: set[int] | None = None) -> dict[int, str]:
+    """
+    Our process, its descendants, and the WebKit helpers it is using.
+
+    WebKit XPC services are spawned by launchd, not by us, so parentage cannot
+    identify them and they have to be matched by name. That over-collects:
+    every other WebKit app on the machine has processes with the same names,
+    and attributing a busy browser to the pet is how a 0.1 % measurement
+    becomes 12 %. Pass the set of helpers that existed *before* the pet started
+    and they are excluded.
+    """
     out = subprocess.run(
         ["ps", "-Ao", "pid=,ppid=,comm="], capture_output=True, text=True
     ).stdout
@@ -55,9 +75,11 @@ def pids_for(root_pid: int, binary_name: str) -> dict[int, str]:
                 found[p] = c
                 changed = True
 
-    # WebKit helpers, attributed to us only if they appeared with the app.
+    # Helpers that appeared after the pet did. Without `preexisting` this is
+    # every WebKit process on the machine, which is almost never what is meant.
+    skip = preexisting or set()
     for p, pp, c in rows:
-        if any(h in c for h in HELPER_HINTS) and p not in found:
+        if any(h in c for h in HELPER_HINTS) and p not in found and p not in skip:
             found[p] = c
     return found
 

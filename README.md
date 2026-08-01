@@ -4,16 +4,16 @@ A desktop pet that is the embodiment of a running AI coding agent. It digs while
 
 **It is a glanceable status display disguised as a toy.** Every design decision is measured against one test: can you tell, in a 200 ms glance and without reading text, whether the agent is busy, waiting on you, or broken?
 
-> **Status: pre-M1.** The workspace, the wire protocol, the Claude Code mapping and the atlas layout are in place and tested. The Tauri shell, the state machine and the renderer are M1 work. Nothing here is installable yet.
+> **Status: M2.** The loop works end to end — a hook payload changes what the pet draws — and it installs as a plugin. Not yet released: no signed build, and the default pet is placeholder art.
 
 ## What is here today
 
 | Package | State | What it does |
 | :-- | :-- | :-- |
 | `packages/protocol` | ✅ | `PetEvent` wire format and the `PetAdapter` contract. Versioned from day one. |
-| `packages/adapter-claude-code` | ✅ mapping · ⏳ CLI | Every piece of Claude Code knowledge in the project: 11 hook events → `PetEvent`, plus tool classification. 41 tests. |
+| `packages/adapter-claude-code` | ✅ | Every piece of Claude Code knowledge in the project: 11 hook events → `PetEvent`, tool classification, the plugin, and `install`/`uninstall`/`doctor`/`record`. |
 | `packages/pet-core/src/packs` | ✅ | Atlas geometry and the state → animation-row map, both derived empirically in Spike D. |
-| `packages/pet-core` (rest) | ⏳ M1 | Tauri shell, HTTP server, xstate machine, renderer, tray. |
+| `packages/pet-core` (rest) | ✅ | Tauri shell, HTTP server, xstate machine, session registry, renderer, tray, demo mode. |
 
 ## Platforms
 

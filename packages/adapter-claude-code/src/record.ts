@@ -135,22 +135,3 @@ export function startRecorder(opts: RecorderOptions): { close: () => void } {
 
   return { close: () => server.close() };
 }
-
-export function hooksBlock(port: number): unknown {
-  const target = { type: "http", url: `http://127.0.0.1:${port}/event/claude-code`, timeout: 2 };
-  const plain = (): unknown => ({ hooks: [target] });
-  const matched = (): unknown => ({ matcher: ".*", hooks: [target] });
-  return {
-    SessionStart: [plain()],
-    SessionEnd: [plain()],
-    UserPromptSubmit: [plain()],
-    PreToolUse: [matched()],
-    PostToolUse: [matched()],
-    PostToolUseFailure: [matched()],
-    PermissionRequest: [matched()],
-    PermissionDenied: [matched()],
-    Notification: [plain()],
-    Stop: [plain()],
-    StopFailure: [plain()],
-  };
-}
