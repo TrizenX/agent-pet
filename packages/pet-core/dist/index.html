@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Pet — Spike A</title>
+    <style>
+      /* Spike A placeholder. M1 replaces this whole directory with the Vite
+         build; the only thing that matters here is that the window background
+         is genuinely transparent and the pet is unmistakable on any wallpaper. */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        -webkit-user-select: none;
+        user-select: none;
+        font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #pet {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-content: center;
+        gap: 6px;
+        justify-items: center;
+        cursor: grab;
+      }
+      .body {
+        width: 128px;
+        height: 128px;
+        border-radius: 28px;
+        background: linear-gradient(160deg, #7c5cff, #3ddc97);
+        box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+        display: grid;
+        place-content: center;
+        font-size: 56px;
+        animation: bob 1.6s ease-in-out infinite;
+      }
+      .label {
+        padding: 3px 9px;
+        border-radius: 999px;
+        color: #fff;
+        background: rgb(0 0 0 / 0.72);
+        letter-spacing: 0.02em;
+      }
+      @keyframes bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .body {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pet" data-tauri-drag-region>
+      <div class="body" data-tauri-drag-region>🐾</div>
+      <div class="label" data-tauri-drag-region>SPIKE A</div>
+    </div>
+  </body>
+</html>

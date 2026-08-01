@@ -1,0 +1,24 @@
+[package]
+name = "agent-pet"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Agent Pet — desktop companion for a running AI coding agent"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `macos-private-api` is what enables a transparent NSWindow. See the App Store
+# note in artifacts/spike-a/FINDINGS.md — this flag has distribution consequences.
+tauri = { version = "2", features = ["macos-private-api"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+block = "0.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
