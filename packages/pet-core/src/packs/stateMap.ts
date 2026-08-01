@@ -6,7 +6,7 @@
  * 4 289-pet gallery, body animation alone cannot carry state.
  */
 
-import { type AtlasRow, ROW_INDEX } from "./atlas.js";
+import { type AtlasRow, ROW_INDEX } from "./atlas.ts";
 
 export type PetState =
   | "sleeping"

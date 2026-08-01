@@ -1,0 +1,25 @@
+{
+  "session_id": "session-0000",
+  "transcript_path": "/home/user/.agent/transcript.jsonl",
+  "cwd": "/home/user/demo-project",
+  "prompt_id": "prompt-0000",
+  "permission_mode": "acceptEdits",
+  "effort": {
+    "level": "<redacted:string:4>"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "<redacted:string:96>",
+    "description": "<redacted:string:37>"
+  },
+  "tool_response": {
+    "stdout": "<redacted:string:35>",
+    "stderr": "<redacted:string:0>",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+  },
+  "tool_use_id": "toolu_0000",
+  "duration_ms": 31
+}
