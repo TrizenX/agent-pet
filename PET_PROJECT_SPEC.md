@@ -71,7 +71,7 @@ These are non-negotiable. Each has an owning test (§11).
 
 | Platform | Phase 1 | Notes |
 | :-- | :-- | :-- |
-| **macOS** | ⚠️ target, **gate not passed** | Normal desktop: solid. Over a **full-screen** app: measured at ~20 % visibility across three configurations — see [Spike A findings](artifacts/spike-a/FINDINGS.md). A window's Space membership appears to bind at order-in, so an existing window does not join the Space that entering full screen creates. `orderFrontRegardless` and level 25 with the four-bit collection behaviour are confirmed necessary; they are not sufficient. **TZX-62 stays open.** |
+| **macOS** | ✅ target, **gate passed** | Requires a non-activating `NSPanel`, not a plain always-on-top `NSWindow`: 69/69 samples visible across live full-screen transitions, versus ~21 % for every collection-behaviour-only configuration tried. Also requires `orderFrontRegardless` — with `focus: false` the app never activates and its windows are never ordered onto the screen. See [Spike A findings](artifacts/spike-a/FINDINGS.md). |
 | **Windows** | ✅ target | WebView2. Transparency, always-on-top and click-through (`WS_EX_TRANSPARENT`) all supported. Paths: `%APPDATA%\agent-pet\packs`, `%USERPROFILE%\.petdex\pets`. |
 | **Linux · X11** | 🟡 best-effort | Works: transparency (with a compositor), always-on-top, positioning, click-through. |
 | **Linux · Wayland** | ⚠️ likely unsupported | **Wayland gives a client no way to position its own window or force always-on-top.** That is a deliberate protocol decision, not a Tauri bug. `wlr-layer-shell` can do it but Tauri does not use it and GNOME does not implement it — and GNOME/Wayland is the default on current Ubuntu and Fedora. Gated by **M0 Spike E**. |

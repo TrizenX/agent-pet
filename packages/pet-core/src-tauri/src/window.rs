@@ -63,6 +63,48 @@ mod macos {
             .and_then(|v| v.parse().ok())
     }
 
+    /// Convert to NSPanel unless explicitly disabled. On by default because
+    /// Spike A · A3 showed the plain NSWindow route does not survive a
+    /// full-screen transition.
+    fn use_panel() -> bool {
+        std::env::var("PET_USE_NSPANEL").map(|v| v != "0").unwrap_or(true)
+    }
+
+    const NONACTIVATING_PANEL: u64 = 1 << 7;
+
+    extern "C" {
+        fn object_setClass(obj: *mut Object, cls: *const objc::runtime::Class)
+            -> *const objc::runtime::Class;
+    }
+
+    /// Re-class the Tauri NSWindow as an NSPanel and mark it non-activating.
+    ///
+    /// This is what shipping overlay apps actually do, and it is a different
+    /// mechanism from collection behaviour: a non-activating panel never
+    /// becomes key, so the window server treats it as auxiliary chrome rather
+    /// than as a document window that belongs to one Space.
+    ///
+    /// Isa-swizzling NSWindow → NSPanel is safe here because NSPanel adds no
+    /// instance variables; it only changes behaviour. The style mask bit is
+    /// meaningless on a plain NSWindow, which is why the class has to change
+    /// first.
+    unsafe fn make_nonactivating_panel(ns_window: *mut Object) {
+        use objc::runtime::{NO, YES};
+
+        object_setClass(ns_window, class!(NSPanel));
+
+        let mask: u64 = msg_send![ns_window, styleMask];
+        let _: () = msg_send![ns_window, setStyleMask: mask | NONACTIVATING_PANEL];
+
+        // Float above the owning app's windows, never take key focus just
+        // because the user clicked, and stay visible when the app deactivates —
+        // which for a background overlay is always.
+        let _: () = msg_send![ns_window, setFloatingPanel: YES];
+        let _: () = msg_send![ns_window, setBecomesKeyOnlyIfNeeded: YES];
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: NO];
+        let _: () = msg_send![ns_window, setWorksWhenModal: NO];
+    }
+
     pub fn apply(window: &WebviewWindow) {
         let Ok(ptr) = window.ns_window() else {
             eprintln!("[window] ns_window() unavailable; overlay behaviour not applied");
@@ -82,7 +124,16 @@ mod macos {
             .unwrap_or(CAN_JOIN_ALL_SPACES | STATIONARY | FULL_SCREEN_AUXILIARY | IGNORES_CYCLE);
         let level = level();
 
+        let panel = use_panel();
+
         unsafe {
+            // Order matters: the class swap must happen before the style mask
+            // and level are set, or they are applied to the wrong class and
+            // partially reset by the conversion.
+            if panel {
+                make_nonactivating_panel(ns_window);
+            }
+
             let _: () = msg_send![ns_window, setCollectionBehavior: behaviour];
             let _: () = msg_send![ns_window, setLevel: level];
             let _: () = msg_send![ns_window, setIgnoresMouseEvents: false];
@@ -100,7 +151,7 @@ mod macos {
         observe_space_changes(ns_window as usize, behaviour, level);
 
         println!(
-            "[window] macOS overlay behaviour applied (collectionBehavior={behaviour:#x}, level={level})"
+            "[window] macOS overlay applied (nspanel={panel}, collectionBehavior={behaviour:#x}, level={level})"
         );
     }
 

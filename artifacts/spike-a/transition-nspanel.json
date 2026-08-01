@@ -1,0 +1,495 @@
+{
+  "verdict": "PASS \u2014 overlay stayed visible across the full-screen transition",
+  "samples": [
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 0
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 1
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 2
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 3
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 4
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 5
+    },
+    {
+      "fullscreen": false,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 6
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 7
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 8
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 9
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 10
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 11
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 12
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 13
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 14
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 15
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 16
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 17
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 18
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 19
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 20
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 21
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 22
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 23
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 24
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 25
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 26
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 27
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 28
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 29
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 30
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 31
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 32
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 33
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 34
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 35
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 36
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 37
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 38
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 39
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 40
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 41
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 42
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 43
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 44
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 45
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 46
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 47
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 48
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 49
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 50
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 51
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 52
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 53
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 54
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 55
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 56
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 57
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 58
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 59
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 60
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 61
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 62
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 63
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 64
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 65
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 66
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 67
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 68
+    },
+    {
+      "fullscreen": true,
+      "exists": true,
+      "onscreen": true,
+      "layer": 25,
+      "t": 69
+    }
+  ]
+}

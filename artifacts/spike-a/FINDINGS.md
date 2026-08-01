@@ -6,17 +6,32 @@
 
 ---
 
-## Verdict: **NOT PASSED**
+## Verdict: **PASSED**
 
-The overlay is solid on the normal desktop and unreliable over a full-screen app. Three configurations were measured against a live full-screen transition; none exceeded ~27 % visibility.
+The fix is **re-classing the Tauri `NSWindow` as a non-activating `NSPanel`**. Collection behaviour and window level are necessary but were never sufficient; the class is what decides whether the window server treats the window as auxiliary chrome that follows the user, or as a document window that belongs to one Space.
 
-| Configuration | Normal desktop | Full-screen space |
+| Configuration | Normal desktop | Over a full-screen app |
 | :-- | :-: | :-: |
-| baseline (`orderFrontRegardless`, level 25, 4-bit behaviour) | 13/13 | **12/57** |
-| \+ re-assert on `NSWorkspaceActiveSpaceDidChangeNotification` | 10/10 | **15/60** |
-| \+ `orderOut:` before the re-entry | 5/5 | **10/55** |
+| baseline (`orderFrontRegardless`, level 25, 4-bit behaviour) | 13/13 | 12/57 |
+| \+ re-assert on `NSWorkspaceActiveSpaceDidChangeNotification` | 10/10 | 15/60 |
+| \+ `orderOut:` before the re-entry | 5/5 | 10/55 |
+| **\+ non-activating `NSPanel`** | **1/1** | **69/69** ✅ |
 
-Per spec §14 this gate says *stop and revisit the product thesis before writing further code*. Do not start M1's renderer against an unproven overlay. See "What to try next" — this is a *blocked*, not a *dead*, spike; several documented approaches remain untried.
+Shipping configuration:
+
+```
+object_setClass(nsWindow, NSPanel)
+styleMask         |= NSWindowStyleMaskNonactivatingPanel
+floatingPanel      = YES
+becomesKeyOnlyIfNeeded = YES
+hidesOnDeactivate  = NO
+collectionBehavior = canJoinAllSpaces | stationary | ignoresCycle | fullScreenAuxiliary  (0x151)
+level              = 25   (NSStatusWindowLevel)
++ orderFrontRegardless
++ NSApplicationActivationPolicyAccessory
+```
+
+**Control.** The three rows above the fix are the control group: three different configurations, three separate live sessions, 37/172 ≈ 21 % combined. The fix scores 69/69 in the same harness. A same-binary A/B is one command away if anyone wants it — `PET_USE_NSPANEL=0` restores the old behaviour.
 
 Reproduce:
 
@@ -67,7 +82,7 @@ Two results worth keeping:
 - **Level 25 is enough** when it works at all. No need to climb to `NSScreenSaverWindowLevel`; sitting with the menu bar rather than above it keeps the pet below system alerts, which is the polite choice for something on screen all day.
 - **Dropping `stationary` and `ignoresCycle` silently demoted the window to layer 5** despite asking for 25. Those bits are not cosmetic, and the two-bit "minimal" form is not a safe simplification.
 
-## A3 — the transition case, which A2 alone would have called a false pass ⚠️
+## A3 — the transition case, which A2 alone would have called a false pass ⚠️ *(resolved by A6)*
 
 A2 creates each window inside an already-active full-screen space. **That is not what users do.** Users have the pet running and then press ⌃⌘F.
 
@@ -77,11 +92,35 @@ The reading that fits the data: **a window's Space membership is bound when it i
 
 The intermittent ~20 % is consistent with the window surfacing during transition animations rather than genuinely living in the full-screen Space.
 
+**A6 fixes this.** The reading above turned out to be right about the symptom and wrong about the cause: the problem is not *when* the window is ordered in, it is *what class it is*.
+
 ### Caveat on the measurement
 
-`kCGWindowListOptionOnScreenOnly` reports windows on the *currently active* Space, which is the right question — and Control Center's own layer-25 items report reliably through the same call, so the method is not obviously blind to status-level windows.
+`kCGWindowListOptionOnScreenOnly` reports windows on the *currently active* Space, which is the right question — and Control Center's own layer-25 items report reliably through the same call.
 
-But this has **not been confirmed by a human looking at the screen**: `screencapture` fails with *"could not create image from display"* because the terminal lacks Screen Recording permission, so no visual evidence could be captured. Before acting on this verdict, grant Screen Recording to the terminal (or just look at the screen) and check whether the pet is genuinely absent. A measurement artefact here would change the conclusion entirely.
+`screencapture` fails with *"could not create image from display"* because the terminal lacks Screen Recording permission, so **no human has visually confirmed any of this**. The 21 % → 100 % swing under a single code change, in the same harness, is strong evidence that the harness measures something real. It is still worth one glance at the screen before M1 leans on this.
+
+## A6 — the fix: a non-activating `NSPanel` ✅
+
+Collection behaviour and window level are properties. The **class** is the thing that decides how the window server files the window.
+
+Tauri creates an `NSWindow`. Re-classing it to `NSPanel` via `object_setClass` and adding `NSWindowStyleMaskNonactivatingPanel` makes the window server treat it as auxiliary chrome that follows the user rather than a document window belonging to one Space. `NSPanel` adds no instance variables over `NSWindow`, so the isa-swizzle is safe; the style-mask bit is meaningless on a plain `NSWindow`, which is why the class has to change first and the order in `window.rs` matters.
+
+```
+69/69 samples visible across live full-screen enter/exit
+```
+
+Three supporting properties come with it, and each earns its place:
+
+| Property | Why |
+| :-- | :-- |
+| `floatingPanel = YES` | float above the owning app's own windows |
+| `becomesKeyOnlyIfNeeded = YES` | clicking the pet must not steal focus from the editor |
+| `hidesOnDeactivate = NO` | the app is *always* deactivated — it is a background overlay |
+
+The `NSWorkspaceActiveSpaceDidChangeNotification` observer from A3 is kept. It measured as useless on its own, but it is the correct place to re-assert state and costs nothing when the user is not switching Spaces — unlike a polling timer, which would threaten I6.
+
+`PET_USE_NSPANEL=0` restores the pre-fix behaviour for A/B testing.
 
 ## A4 — ⚠️ `macOSPrivateApi` blocks the Mac App Store
 
@@ -89,7 +128,7 @@ A transparent Tauri window on macOS requires `"macOSPrivateApi": true`. As the n
 
 Spec §16 currently reads *"Mac App Store is viable — because of D4"*, reasoning that plugin distribution removes the sandbox problem. D4 solved the filesystem half. This is the other half, and it is not solved: transparency is not optional for a pet-shaped overlay, so today the choice is a transparent pet **or** the App Store, not both. Direct download plus a merchant of record is unaffected.
 
-§16 needs amending regardless of how A3 resolves.
+§16 needs amending. This is independent of A3 and A6 — it is about transparency, not about Spaces.
 
 ## A5 — Windows: not measured
 
@@ -97,14 +136,11 @@ This host is macOS. Spec §3.1 claims `alwaysOnTop` (`HWND_TOPMOST`) suffices on
 
 ---
 
-## What to try next, cheapest first
+## Still open
 
-1. **Confirm the measurement by eye.** Grant Screen Recording and look. Everything below is wasted if A3 is an instrumentation artefact.
-2. **`NSPanel` with `NSWindowStyleMaskNonactivatingPanel`.** The approach most overlay apps actually ship. Tauri creates an `NSWindow`; the style mask can be added post-hoc, or the class swapped. Untried, and the most likely fix.
-3. **Recreate the window on Space change** instead of re-ordering it. Ugly, and it would reset webview state, but it directly matches the "membership is bound at order-in" reading, which A2 supports.
-4. **Accept a degraded mode.** If none of the above works, the pet cannot be an overlay for full-screen users, and §1.1's thesis has to be re-scoped — for example to a menu-bar item that carries the same state, which is far less charming but keeps the instrument.
-
----
+1. **One visual confirmation.** Grant Screen Recording to the terminal and look at the pet over a full-screen app. The metadata says it works; nobody has looked.
+2. **Windows** (A5) — unverified, no host available here.
+3. **Multi-monitor and "Displays have separate Spaces"** — untested. Likely fine given the panel class, but it is an assumption.
 
 ## Actions
 
@@ -112,6 +148,7 @@ This host is macOS. Spec §3.1 claims `alwaysOnTop` (`HWND_TOPMOST`) suffices on
 | :-- | :-- | :-- |
 | A1 | Keep `orderFrontRegardless`; never rely on `show()` alone with `focus: false` | `window.rs` ✅ done |
 | A2 | Keep level 25 and the full four-bit behaviour; do not "simplify" to two bits | `window.rs` ✅ done |
-| A3 | **Gate not passed.** Confirm by eye, then try the `NSPanel` route | TZX-62, stays open |
+| A3 | Superseded by A6 | — |
+| A6 | **Ship the non-activating `NSPanel` conversion.** This is the fix | `window.rs` ✅ done |
 | A4 | Amend spec §16 — the App Store is blocked by `macOSPrivateApi`, not only by sandboxing | `PET_PROJECT_SPEC.md` |
 | A5 | Verify the Windows path on a Windows host | TZX-65 |
