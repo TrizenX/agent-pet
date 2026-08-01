@@ -1,0 +1,8 @@
+{
+  "name": "agent-pet",
+  "version": "0.1.0",
+  "description": "Drives the Agent Pet desktop companion from Claude Code hooks.",
+  "author": { "name": "TrizenX", "url": "https://github.com/TrizenX/agent-pet" },
+  "homepage": "https://github.com/TrizenX/agent-pet",
+  "license": "MIT"
+}

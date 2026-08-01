@@ -15,9 +15,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:no-agent-strings": "node scripts/lint-no-agent-strings.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && pnpm test",
+    "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && node scripts/generate-hooks-json.mjs --check && pnpm test",
     "dev": "pnpm --filter @agent-pet/pet-core dev",
-    "tauri": "pnpm --filter @agent-pet/pet-core tauri"
+    "tauri": "pnpm --filter @agent-pet/pet-core tauri",
+    "hooks:generate": "node scripts/generate-hooks-json.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",
