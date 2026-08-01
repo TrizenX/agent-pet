@@ -71,7 +71,7 @@ These are non-negotiable. Each has an owning test (§11).
 
 | Platform | Phase 1 | Notes |
 | :-- | :-- | :-- |
-| **macOS** | ✅ target | Floating above **full-screen** apps is not free — needs `set_visible_on_all_workspaces` plus `fullScreenAuxiliary` in the window's collection behaviour. Gated by **M0 Spike A**. |
+| **macOS** | ⚠️ target, **gate not passed** | Normal desktop: solid. Over a **full-screen** app: measured at ~20 % visibility across three configurations — see [Spike A findings](artifacts/spike-a/FINDINGS.md). A window's Space membership appears to bind at order-in, so an existing window does not join the Space that entering full screen creates. `orderFrontRegardless` and level 25 with the four-bit collection behaviour are confirmed necessary; they are not sufficient. **TZX-62 stays open.** |
 | **Windows** | ✅ target | WebView2. Transparency, always-on-top and click-through (`WS_EX_TRANSPARENT`) all supported. Paths: `%APPDATA%\agent-pet\packs`, `%USERPROFILE%\.petdex\pets`. |
 | **Linux · X11** | 🟡 best-effort | Works: transparency (with a compositor), always-on-top, positioning, click-through. |
 | **Linux · Wayland** | ⚠️ likely unsupported | **Wayland gives a client no way to position its own window or force always-on-top.** That is a deliberate protocol decision, not a Tauri bug. `wlr-layer-shell` can do it but Tauri does not use it and GNOME does not implement it — and GNOME/Wayland is the default on current Ubuntu and Fedora. Gated by **M0 Spike E**. |
@@ -764,7 +764,7 @@ Two unknowns can invalidate the design. Prove them before building anything.
 ## 16. Distribution (context, not implementation work)
 
 - Direct download: notarised `.dmg` + Windows installer. Payments through a merchant of record (Paddle / Lemon Squeezy).
-- Mac App Store is viable **because** of D4: with plugin distribution the app writes nothing outside its sandbox. If the `settings.json` fallback ever ships to MAS it must become a user-driven file-picker flow — and it is already isolated in `adapter-claude-code/install.ts` so that nothing else in the app assumes free filesystem access.
+- Mac App Store: **blocked, and not by sandboxing.** D4 solved the filesystem half — with plugin distribution the app writes nothing outside its sandbox. M0 Spike A found the other half: a transparent Tauri window on macOS requires `macOSPrivateApi`, which calls private API and makes the app ineligible for the App Store. Transparency is not optional for a pet-shaped overlay, so today it is a transparent pet **or** the App Store, not both. Direct download through a merchant of record is unaffected. If the `settings.json` fallback ever ships to MAS it must become a user-driven file-picker flow — and it is already isolated in `adapter-claude-code/install.ts` so that nothing else in the app assumes free filesystem access.
 - Demo mode (§11.2) makes the app fully demonstrable without Claude Code installed — required for App Review, useful for the landing page.
 - **On the moat:** see §17. The short version: the pack ecosystem is *already built by someone else*, so it is no longer available as a moat. What remains is instrument fidelity (D12) and, later, the Pet Protocol.
 

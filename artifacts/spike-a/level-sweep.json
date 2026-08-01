@@ -1,0 +1,188 @@
+[
+  {
+    "level": 25,
+    "level_name": "NSStatusWindowLevel",
+    "behaviour": 337,
+    "behaviour_name": "canJoinAllSpaces|stationary|ignoresCycle|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 25,
+      "alpha": 1.0,
+      "bounds": [
+        -321,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 25,
+    "level_name": "NSStatusWindowLevel",
+    "behaviour": 345,
+    "behaviour_name": "\u2026|transient",
+    "onscreen": true,
+    "observed": {
+      "layer": 25,
+      "alpha": 1.0,
+      "bounds": [
+        -1733,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 25,
+    "level_name": "NSStatusWindowLevel",
+    "behaviour": 257,
+    "behaviour_name": "canJoinAllSpaces|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 5,
+      "alpha": 1.0,
+      "bounds": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "level": 101,
+    "level_name": "NSPopUpMenuWindowLevel",
+    "behaviour": 337,
+    "behaviour_name": "canJoinAllSpaces|stationary|ignoresCycle|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 101,
+      "alpha": 1.0,
+      "bounds": [
+        1256,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 101,
+    "level_name": "NSPopUpMenuWindowLevel",
+    "behaviour": 345,
+    "behaviour_name": "\u2026|transient",
+    "onscreen": true,
+    "observed": {
+      "layer": 101,
+      "alpha": 1.0,
+      "bounds": [
+        1256,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 101,
+    "level_name": "NSPopUpMenuWindowLevel",
+    "behaviour": 257,
+    "behaviour_name": "canJoinAllSpaces|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 101,
+      "alpha": 1.0,
+      "bounds": [
+        1256,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 200,
+    "level_name": "NSScreenSaverWindowLevel-ish",
+    "behaviour": 337,
+    "behaviour_name": "canJoinAllSpaces|stationary|ignoresCycle|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 200,
+      "alpha": 1.0,
+      "bounds": [
+        1256,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 200,
+    "level_name": "NSScreenSaverWindowLevel-ish",
+    "behaviour": 345,
+    "behaviour_name": "\u2026|transient",
+    "onscreen": false,
+    "observed": null
+  },
+  {
+    "level": 200,
+    "level_name": "NSScreenSaverWindowLevel-ish",
+    "behaviour": 257,
+    "behaviour_name": "canJoinAllSpaces|fullScreenAuxiliary",
+    "onscreen": false,
+    "observed": null
+  },
+  {
+    "level": 1000,
+    "level_name": "NSScreenSaverWindowLevel",
+    "behaviour": 337,
+    "behaviour_name": "canJoinAllSpaces|stationary|ignoresCycle|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 1000,
+      "alpha": 1.0,
+      "bounds": [
+        -1404,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 1000,
+    "level_name": "NSScreenSaverWindowLevel",
+    "behaviour": 345,
+    "behaviour_name": "\u2026|transient",
+    "onscreen": true,
+    "observed": {
+      "layer": 1000,
+      "alpha": 1.0,
+      "bounds": [
+        -1894,
+        654,
+        208,
+        232
+      ]
+    }
+  },
+  {
+    "level": 1000,
+    "level_name": "NSScreenSaverWindowLevel",
+    "behaviour": 257,
+    "behaviour_name": "canJoinAllSpaces|fullScreenAuxiliary",
+    "onscreen": true,
+    "observed": {
+      "layer": 1000,
+      "alpha": 1.0,
+      "bounds": [
+        -2441,
+        213,
+        208,
+        232
+      ]
+    }
+  }
+]

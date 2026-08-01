@@ -8,7 +8,9 @@
       "**/*.json",
       "!**/target",
       "!**/dist",
-      "!**/artifacts"
+      "!**/artifacts",
+      "!**/gen/schemas",
+      "!**/src-tauri/target"
     ]
   },
   "formatter": {
