@@ -26,6 +26,21 @@ A desktop pet that is the embodiment of a running AI coding agent. It digs while
 
 Everything shipped so far is pure TypeScript with no OS assumptions — the platform surface is entirely in the Tauri shell, which is still M1 work. See spec §3.1.
 
+## Install
+
+```
+/plugin marketplace add TrizenX/agent-pet
+/plugin install agent-pet@trizenx
+```
+
+Then start the pet. Not sure whether it worked:
+
+```
+node packages/adapter-claude-code/src/cli.ts doctor
+```
+
+`doctor` exists because all three ways this setup fails are silent — the pet is not running, the hooks are not installed, or they point at a port nothing is listening on. None of them produce an error anywhere; the pet simply never reacts.
+
 ## Read this first
 
 - **[`PET_PROJECT_SPEC.md`](PET_PROJECT_SPEC.md)** — the single source of truth. §2 lists the hard invariants; §13 lists decisions that are already closed.

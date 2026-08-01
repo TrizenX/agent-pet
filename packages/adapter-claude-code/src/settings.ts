@@ -101,3 +101,38 @@ export function uninstallHooks(port: number, path = SETTINGS_PATH): { removed: n
   write(path, settings);
   return { removed };
 }
+
+/** Which of our hook events are currently present in the settings file. */
+export function installedEvents(port: number, path = SETTINGS_PATH): string[] {
+  if (!existsSync(path)) return [];
+  let settings: Json;
+  try {
+    settings = JSON.parse(readFileSync(path, "utf8")) as Json;
+  } catch {
+    return [];
+  }
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks) return [];
+  const url = ourUrl(port);
+  return Object.entries(hooks)
+    .filter(([, entries]) => entries.some((e) => isOurs(e, url)))
+    .map(([event]) => event);
+}
+
+/**
+ * Whether the plugin is enabled for this user.
+ *
+ * Read from the same settings file rather than by scanning the plugin cache:
+ * an installed-but-disabled plugin sends no hooks, and "installed" is not the
+ * question a user asking why their pet is idle actually has.
+ */
+export function pluginInstalled(path = SETTINGS_PATH): boolean {
+  if (!existsSync(path)) return false;
+  try {
+    const settings = JSON.parse(readFileSync(path, "utf8")) as Json;
+    const enabled = settings.enabledPlugins as Record<string, boolean> | undefined;
+    return Object.entries(enabled ?? {}).some(([key, on]) => on && key.startsWith("agent-pet@"));
+  } catch {
+    return false;
+  }
+}

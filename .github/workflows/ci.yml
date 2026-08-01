@@ -25,6 +25,8 @@ jobs:
       # Invariant I5: pet-core must contain zero hardcoded agent knowledge.
       - run: pnpm lint:no-agent-strings
       - run: pnpm test
+      # The plugin ships a copy of what the adapter generates.
+      - run: node scripts/generate-hooks-json.mjs --check
 
   spike-tools:
     # The Spike D scripts are the source of truth for the atlas layout; keep

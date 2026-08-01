@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { claudeCodeAdapter } from "../src/mapping.ts";
 import { hooksBlock } from "../src/record.ts";
-import { installHooks, ourUrl, uninstallHooks } from "../src/settings.ts";
+import {
+  installedEvents,
+  installHooks,
+  ourUrl,
+  pluginInstalled,
+  uninstallHooks,
+} from "../src/settings.ts";
 
 const PORT = 48200;
 const block = () => hooksBlock(PORT) as Record<string, unknown[]>;
@@ -209,5 +215,54 @@ describe("hookConfig — what the tray puts on the clipboard", () => {
         expect(entry.hooks[0]?.timeout, event).toBeLessThanOrEqual(2);
       }
     }
+  });
+});
+
+describe("installedEvents — what doctor reports", () => {
+  it("lists nothing before install and everything after", () => {
+    write(USER_SETTINGS);
+    expect(installedEvents(PORT, file)).toEqual([]);
+    installHooks(block(), PORT, file);
+    expect(installedEvents(PORT, file)).toHaveLength(11);
+  });
+
+  it("ignores the user's own hooks on the same events", () => {
+    // USER_SETTINGS has a Stop hook of its own; it must not count as ours.
+    write(USER_SETTINGS);
+    expect(installedEvents(PORT, file)).toEqual([]);
+  });
+
+  it("does not see another port's install", () => {
+    installHooks(block(), PORT, file);
+    expect(installedEvents(59999, file)).toEqual([]);
+  });
+
+  it("survives a corrupt or missing file", () => {
+    writeFileSync(file, "{ not json");
+    expect(installedEvents(PORT, file)).toEqual([]);
+    expect(installedEvents(PORT, join(dir, "nope.json"))).toEqual([]);
+  });
+});
+
+describe("pluginInstalled", () => {
+  it("is true only when the plugin is enabled", () => {
+    write({ enabledPlugins: { "agent-pet@trizenx": true } });
+    expect(pluginInstalled(file)).toBe(true);
+
+    // Installed but switched off sends no hooks, which is the question a user
+    // asking why their pet is idle actually has.
+    write({ enabledPlugins: { "agent-pet@trizenx": false } });
+    expect(pluginInstalled(file)).toBe(false);
+  });
+
+  it("is not confused by other plugins", () => {
+    write({ enabledPlugins: { "something-else@vendor": true } });
+    expect(pluginInstalled(file)).toBe(false);
+  });
+
+  it("survives a corrupt or missing file", () => {
+    writeFileSync(file, "nonsense");
+    expect(pluginInstalled(file)).toBe(false);
+    expect(pluginInstalled(join(dir, "nope.json"))).toBe(false);
   });
 });

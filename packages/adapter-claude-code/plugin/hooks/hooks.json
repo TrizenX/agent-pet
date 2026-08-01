@@ -3,21 +3,33 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
@@ -25,7 +37,11 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
@@ -33,7 +49,11 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
@@ -41,7 +61,11 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
@@ -49,7 +73,11 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
@@ -57,28 +85,44 @@
       {
         "matcher": ".*",
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
     "Notification": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ],
     "StopFailure": [
       {
         "hooks": [
-          { "type": "http", "url": "http://127.0.0.1:48200/event/claude-code", "timeout": 2 }
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:48200/event/claude-code",
+            "timeout": 2
+          }
         ]
       }
     ]

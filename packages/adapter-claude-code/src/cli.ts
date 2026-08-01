@@ -1,6 +1,13 @@
 import { resolve } from "node:path";
 import { hooksBlock, startRecorder } from "./record.ts";
-import { installHooks, ourUrl, SETTINGS_PATH, uninstallHooks } from "./settings.ts";
+import {
+  installedEvents,
+  installHooks,
+  ourUrl,
+  pluginInstalled,
+  SETTINGS_PATH,
+  uninstallHooks,
+} from "./settings.ts";
 
 /**
  * `pet-adapter` — install | uninstall | doctor | record.
@@ -48,13 +55,68 @@ function cmdUninstall(argv: readonly string[]): number {
   return 0;
 }
 
-function cmdDoctor(argv: readonly string[]): number {
+/**
+ * Diagnose, rather than print.
+ *
+ * The three ways this setup fails are all silent: the pet is not running, the
+ * hooks are not installed, or they point at a port nothing is listening on.
+ * None of them produce an error anywhere — the pet simply never reacts — so the
+ * only useful thing a doctor can do is check each one and say which it is.
+ */
+async function cmdDoctor(argv: readonly string[]): Promise<number> {
   const port = portFrom(argv, DEFAULT_PORT);
-  console.log(`settings: ${SETTINGS_PATH}`);
-  console.log(`endpoint: ${ourUrl(port)}`);
-  console.log("\nPaste this into the `hooks` object if installing by hand:\n");
-  console.log(JSON.stringify(hooksBlock(port), null, 2));
-  return 0;
+  const url = ourUrl(port);
+  let healthy = false;
+  let reported: unknown;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/health`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    healthy = res.ok;
+    reported = await res.json();
+  } catch {
+    healthy = false;
+  }
+
+  const installed = installedEvents(port);
+  const plugin = pluginInstalled();
+
+  console.log(`endpoint  ${url}`);
+  console.log(
+    `pet       ${healthy ? "running" : "NOT running — start Agent Pet, or hooks will do nothing"}`,
+  );
+  if (healthy && reported && typeof reported === "object") {
+    const h = reported as { webview?: { connected?: boolean; sessions?: number } };
+    console.log(
+      `          webview ${h.webview?.connected ? "connected" : "NOT connected"}, ` +
+        `${h.webview?.sessions ?? 0} session(s)`,
+    );
+  }
+  console.log(
+    `plugin    ${plugin ? "installed" : "not installed  (/plugin install agent-pet@trizenx)"}`,
+  );
+  console.log(
+    `hooks     ${
+      installed.length > 0
+        ? `${installed.length}/11 events in ${SETTINGS_PATH}`
+        : `none in ${SETTINGS_PATH}`
+    }`,
+  );
+
+  if (!plugin && installed.length === 0) {
+    console.log("\nNothing is wired up. Either:");
+    console.log("  /plugin install agent-pet@trizenx        (recommended)");
+    console.log(`  pet-adapter install${port === DEFAULT_PORT ? "" : ` --port ${port}`}`);
+  } else if (plugin && installed.length > 0) {
+    console.log("\nBoth paths are active. Harmless — each event just arrives twice — but");
+    console.log("`pet-adapter uninstall` will leave only the plugin.");
+  } else if (!healthy) {
+    console.log("\nHooks are wired but nothing is listening. Start the pet, or if it is");
+    console.log("running on another port, reinstall the hooks with --port.");
+  }
+
+  return healthy && (plugin || installed.length > 0) ? 0 : 1;
 }
 
 function cmdRecord(argv: readonly string[]): number {
@@ -86,13 +148,14 @@ function cmdRecord(argv: readonly string[]): number {
 
 const COMMANDS = ["install", "uninstall", "doctor", "record"] as const;
 
-export function main(argv: readonly string[]): number {
+export function main(argv: readonly string[]): number | Promise<number> {
   switch (argv[0]) {
     case "install":
       return cmdInstall(argv);
     case "uninstall":
       return cmdUninstall(argv);
     case "doctor":
+      // Returns a promise; the entry point below awaits it.
       return cmdDoctor(argv);
     case "record":
       return cmdRecord(argv);
@@ -104,7 +167,7 @@ export function main(argv: readonly string[]): number {
 }
 
 if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) {
-  const code = main(process.argv.slice(2));
+  const code = await main(process.argv.slice(2));
   // `record` keeps the event loop alive on purpose; everything else exits.
   if (process.argv[2] !== "record") process.exit(code);
 }

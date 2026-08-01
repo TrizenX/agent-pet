@@ -1,0 +1,18 @@
+{
+  "name": "trizenx",
+  "owner": {
+    "name": "TrizenX",
+    "url": "https://github.com/TrizenX"
+  },
+  "plugins": [
+    {
+      "name": "agent-pet",
+      "source": "./packages/adapter-claude-code/plugin",
+      "description": "Makes the Agent Pet desktop companion react to what this session is doing. Sends hook events to a local endpoint; if the pet is not running, every hook is refused instantly and nothing changes.",
+      "version": "0.1.0",
+      "author": { "name": "TrizenX" },
+      "category": "productivity",
+      "keywords": ["desktop", "status", "companion"]
+    }
+  ]
+}
