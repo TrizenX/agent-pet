@@ -52,6 +52,25 @@ export function useAgentEvents(): AgentEventsState {
       log.current = [...log.current.slice(-(LOG_LIMIT - 1)), entry];
     };
 
+    // Lets /health answer for the whole app while the shell stays ignorant of
+    // which agents exist (I5).
+    //
+    // Re-reported whenever the count changes, not just once at mount. Reporting
+    // only at mount pinned `sessions` at 0 forever — the M2 invariant suite
+    // caught it by asking /health a question the app could not answer honestly.
+    let lastReported = -1;
+    const report = () => {
+      if (reg.size === lastReported) return;
+      lastReported = reg.size;
+      void invoke("report_ready", {
+        adapters: ADAPTERS.map((a) => a.id),
+        sessions: reg.size,
+      }).catch(() => {
+        /* running outside the shell, e.g. `vite` on its own */
+      });
+    };
+    report();
+
     const handle = (raw: AgentRaw) => {
       const result = ingestInto(reg, raw);
       record({
@@ -61,6 +80,7 @@ export function useAgentEvents(): AgentEventsState {
           ? `dropped: ${result.dropped}`
           : result.events.map((e) => e.type).join(", "),
       });
+      report();
       bump();
     };
 
@@ -71,17 +91,9 @@ export function useAgentEvents(): AgentEventsState {
       if (evicted.length > 0) {
         record({ at: Date.now(), source: "registry", summary: `evicted ${evicted.join(", ")}` });
       }
+      report();
       bump();
     }, TICK_MS);
-
-    // Lets /health answer for the whole app while the shell stays ignorant of
-    // which agents exist (I5).
-    void invoke("report_ready", {
-      adapters: ADAPTERS.map((a) => a.id),
-      sessions: reg.size,
-    }).catch(() => {
-      /* running outside the shell, e.g. `vite` on its own */
-    });
 
     return () => {
       clearInterval(timer);

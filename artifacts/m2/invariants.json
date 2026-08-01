@@ -1,0 +1,83 @@
+[
+  {
+    "name": "every hook response is 204 with an empty body",
+    "invariant": "I1",
+    "passed": true,
+    "detail": "all inputs answered 204/0 bytes",
+    "data": {
+      "cases": 8
+    }
+  },
+  {
+    "name": "browser-originated requests are refused",
+    "invariant": "\u00a710",
+    "passed": true,
+    "detail": "origin=403, sec-fetch-site=403, sec-fetch-mode=403",
+    "data": {}
+  },
+  {
+    "name": "a hook round-trip costs well under a millisecond",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "median 0.202 ms, p99 0.439 ms over 200 requests",
+    "data": {
+      "median_ms": 0.2024,
+      "p99_ms": 0.439,
+      "n": 200
+    }
+  },
+  {
+    "name": "concurrent sessions are tracked separately",
+    "invariant": "\u00a78",
+    "passed": true,
+    "detail": "4 live session(s) after interleaving two",
+    "data": {
+      "sessions": 4,
+      "received": 249,
+      "since": 1785604911615
+    }
+  },
+  {
+    "name": "an idle pet costs approximately nothing",
+    "invariant": "I6",
+    "passed": true,
+    "detail": "0.200 % of one core over 45 s, RSS 416 -> 371 MB",
+    "data": {
+      "cpu_percent": 0.1998,
+      "rss_start_mb": 416,
+      "rss_end_mb": 371
+    }
+  },
+  {
+    "name": "memory stays flat over a long run",
+    "invariant": "M2 soak",
+    "passed": true,
+    "detail": "378 -> 255 MB over 10 min (-737.8 MB/h), 119 sessions",
+    "data": {
+      "first_mb": 378,
+      "last_mb": 255,
+      "mb_per_hour": -737.82,
+      "sessions": 119,
+      "minutes": 10.0,
+      "samples": 119
+    }
+  },
+  {
+    "name": "a stopped pet costs the agent nothing",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "0.106 ms per refused connection",
+    "data": {
+      "per_request_ms": 0.1062
+    }
+  },
+  {
+    "name": "a hung pet still bounds the agent's wait",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "agent waited 2502 ms before the hook timeout would fire",
+    "data": {
+      "waited_ms": 2502
+    }
+  }
+]
