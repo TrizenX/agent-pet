@@ -88,6 +88,21 @@ export function App() {
     console.log(`[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""}`);
   }, [state, snapshot.label]);
 
+  // The tray can persist a pack the frontend cannot find, and the fallback to
+  // the built-in pet looks identical to never having chosen one. Saying so
+  // turns "my pet did not change" into something a user can report — it is how
+  // the directory-name/manifest-id mismatch stayed invisible.
+  useEffect(() => {
+    if (!installed.length) return;
+    if (!shell.pack) return;
+    const found = installed.some((p) => p.id === shell.pack);
+    if (found) console.log(`[packs] showing "${shell.pack}"`);
+    else
+      console.warn(
+        `[packs] selected pack "${shell.pack}" is not among the ${installed.length} loaded; showing the built-in pet`,
+      );
+  }, [shell.pack, installed]);
+
   // Nothing is drawn until the sheet is decoded. A transparent window showing
   // nothing is the correct intermediate state for an overlay — a spinner would
   // be more visible than the pet it is standing in for.

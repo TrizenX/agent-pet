@@ -23,12 +23,28 @@ async function decode(url: string): Promise<ImageData> {
 }
 
 export async function loadDefaultPack(): Promise<LoadedPack> {
-  const result = buildPack(manifest, await decode(sheetUrl), sheetUrl);
+  let sheet: ImageData;
+  try {
+    sheet = await decode(sheetUrl);
+  } catch (e) {
+    // The one pack with nothing beneath it. An installed pack that fails to
+    // load falls back to this one; this one falling back to a rejected promise
+    // left `pack` null forever and the window rendering nothing — the terminal
+    // state I4 exists to forbid, reached through the file that claims to
+    // prevent it.
+    console.error(`[packs] built-in sheet undecodable: ${e instanceof Error ? e.message : e}`);
+    return fallbackPack();
+  }
+
+  const result = buildPack(manifest, sheet, sheetUrl);
   if (result.ok) return result.pack;
 
-  // Unreachable in a correct build, but the pet must exist regardless (I4):
-  // a blank sheet is better than no window.
   console.error(`[packs] built-in pet failed to load: ${describeProblem(result.problem)}`);
+  return fallbackPack();
+}
+
+/** A pet-shaped nothing. A blank sheet is better than no window (I4). */
+function fallbackPack(): LoadedPack {
   return {
     id: "fallback",
     displayName: "Fallback",

@@ -28,13 +28,19 @@ const ALLOWED = new Set([
   // for tests — the rule already caught an agent name in a machine test
   // comment, which was a real smell.
   "pipeline.test.ts",
-  // Pack install roots. `~/.codex/pets` names a tool, but it is an *art*
-  // location, not agent knowledge: the list would be identical whether we
-  // supported zero adapters or ten, and adding an adapter never changes it.
-  // Exempting the file rather than obfuscating the path, because a composed
-  // string would defeat the check without defeating the coupling.
-  "packs.rs",
 ]);
+
+/**
+ * Lines that are allowed to match, keyed by file.
+ *
+ * Scoped to a substring rather than a whole file. `packs.rs` needs to name an
+ * install root — `~/.codex/pets` names a tool, but it is an *art* location, not
+ * agent knowledge: the list would be identical whether we supported zero
+ * adapters or ten. Exempting the whole file to say that would also blind the
+ * check to every other forbidden string anyone adds to it later, which is the
+ * shape of the gap this script exists to close.
+ */
+const ALLOWED_LINES = new Map([["packs.rs", [".codex/pets", '"codex".to_string()']]]);
 
 /** Strings that would mean agent knowledge has leaked out of the adapter. */
 const FORBIDDEN = [
@@ -63,8 +69,10 @@ for (const root of SCAN_ROOTS) {
     const rel = relative(root.dir, file).split(sep).join("/");
     if (ALLOWED.has(rel)) continue;
 
+    const exempt = ALLOWED_LINES.get(rel) ?? [];
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, i) => {
+      if (exempt.some((s) => line.includes(s))) return;
       for (const { pattern, label } of FORBIDDEN) {
         if (pattern.test(line)) {
           console.error(

@@ -89,8 +89,16 @@ fn main() {
                 .expect("window `pet` missing from tauri.conf.json");
 
             let saved = settings::load(app.handle());
+            // One scan, at startup, shared by the tray and the frontend. See
+            // `tray::AppState::packs`.
+            let found = packs::discover(app.handle());
+            println!("[packs] discovered {}", found.len());
+            for p in &found {
+                println!("[packs]   {} ({}) sheet={:?}", p.id, p.root, p.sheet.is_some());
+            }
             let shared = std::sync::Arc::new(tray::AppState {
                 settings: std::sync::Mutex::new(saved.clone()),
+                packs: found,
             });
             app.manage(shared.clone());
 
@@ -101,7 +109,7 @@ fn main() {
                     .map(|p| window::clamp_to_visible(&win, p))
                     .unwrap_or_else(|| window::default_corner(&win)),
             );
-            tray::build(app.handle(), &saved)?;
+            tray::build(app.handle(), &saved, &shared.packs)?;
             remember_position(&win, app.handle().clone(), shared);
 
             println!(
@@ -182,17 +190,12 @@ const CONSOLE_BRIDGE: &str = r#"
 /// step with `packs/atlas.ts`.
 #[tauri::command]
 fn list_packs(app: tauri::AppHandle) -> Vec<packs::DiscoveredPack> {
-    let found = packs::discover(&app);
-    println!("[packs] discovered {}", found.len());
-    for p in &found {
-        println!(
-            "[packs]   {} ({}) sheet={:?}",
-            p.id,
-            p.root,
-            p.sheet.is_some()
-        );
+    // The list `setup` scanned, not a second scan: the tray persists a pack by
+    // the id it saw, and the frontend has to look it up by that same id.
+    match app.try_state::<Arc<tray::AppState>>() {
+        Some(shared) => shared.packs.clone(),
+        None => Vec::new(),
     }
-    found
 }
 
 /// Put text on the clipboard on the frontend's behalf.
