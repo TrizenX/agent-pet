@@ -18,7 +18,11 @@ describe("classifyTool", () => {
     ["BashOutput", "bash"],
     ["Edit", "file_edit"],
     ["NotebookEdit", "file_edit"],
-    ["Grep", "file_read"],
+    ["Read", "file_read"],
+    // Searching, not reading. `search` sat in ToolKind unused from M0 until
+    // this, so a grep said "Reading TODO".
+    ["Grep", "search"],
+    ["Glob", "search"],
     ["WebFetch", "network"],
     ["Task", "delegate"],
     ["mcp__linear__save_issue", "delegate"],

@@ -15,7 +15,13 @@ import type { PetEvent } from "@agent-pet/protocol";
 import { type Actor, createActor } from "xstate";
 import { type PetMachineEvent, petMachine, toPetState } from "../machine/petMachine.ts";
 import type { PetState } from "../packs/stateMap.ts";
-import { focusLabel, needsAttention, pickFocus, type SessionView } from "./focus.ts";
+import {
+  focusLabel,
+  needsAttention,
+  orderForDisplay,
+  pickFocus,
+  type SessionView,
+} from "./focus.ts";
 
 /**
  * How long a silent session is kept.
@@ -92,7 +98,7 @@ export class SessionRegistry {
       focused,
       label: focusLabel(focused, views.length),
       liveCount: views.length,
-      sessions: views,
+      sessions: orderForDisplay(views),
     };
   }
 

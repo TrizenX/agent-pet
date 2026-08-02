@@ -7,7 +7,7 @@ import type { PetState } from "../packs/stateMap.ts";
 import { speechFor } from "../packs/strings.ts";
 import { Pet } from "./Pet.tsx";
 import { SessionBadge } from "./SessionBadge.tsx";
-import { SpeechBubble } from "./SpeechBubble.tsx";
+import { SpeechBubble, type SpeechLine } from "./SpeechBubble.tsx";
 import { StateGlyph } from "./StateGlyph.tsx";
 
 function sheet(counts: readonly number[]): ImageData {
@@ -199,19 +199,49 @@ describe("what the pet says", () => {
 });
 
 describe("SpeechBubble", () => {
+  const line = (id: string, text: string, extra: Partial<SpeechLine> = {}): SpeechLine => ({
+    id,
+    text,
+    ...extra,
+  });
+
   it("renders the line it is given", () => {
-    render(<SpeechBubble text="Running pnpm test" />);
+    render(<SpeechBubble lines={[line("a", "Running pnpm test")]} />);
     expect(screen.getByText("Running pnpm test")).toBeTruthy();
   });
 
   it("says nothing when there is nothing to say", () => {
-    render(<SpeechBubble text={undefined} />);
+    render(<SpeechBubble lines={[]} />);
     expect(document.querySelector(".pet-bubble")).toBeNull();
   });
 
-  it("names the project when one was supplied", () => {
-    render(<SpeechBubble text="May I?" project="acme-api" />);
-    expect(screen.getByText("acme-api")).toBeTruthy();
+  it("gives every session a line of its own", () => {
+    // The whole reason this stopped being a single string: with three agents
+    // running you could see one of them and had no way to know the rest
+    // existed.
+    render(
+      <SpeechBubble
+        lines={[
+          line("a", "May I?", { project: "viparse", attention: true }),
+          line("b", "Running pnpm test", { project: "agent-pet" }),
+          line("c", "Reading atlas.ts", { project: "corpus" }),
+        ]}
+      />,
+    );
+
+    expect(document.querySelectorAll(".pet-bubble-line")).toHaveLength(3);
+    expect(screen.getByText("viparse")).toBeTruthy();
+    expect(screen.getByText("Running pnpm test")).toBeTruthy();
+  });
+
+  it("marks the session that is waiting on the user", () => {
+    render(<SpeechBubble lines={[line("a", "May I?", { project: "p", attention: true })]} />);
+    expect(document.querySelector(".pet-bubble-line[data-attention]")).toBeTruthy();
+  });
+
+  it("omits the project name when there is only one line to tell apart", () => {
+    render(<SpeechBubble lines={[line("a", "Running pnpm test", { project: "agent-pet" })]} />);
+    expect(screen.queryByText("agent-pet")).toBeNull();
   });
 });
 

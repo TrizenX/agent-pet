@@ -18,8 +18,12 @@ const EXACT: Readonly<Record<string, ToolKind>> = {
   NotebookEdit: "file_edit",
 
   Read: "file_read",
-  Glob: "file_read",
-  Grep: "file_read",
+
+  // Searching, not reading. `search` had been in `ToolKind` since M0 with
+  // nothing mapped to it, so the pet said "Reading TODO" for a grep — and the
+  // one row in the atlas that suits rummaging around went unused.
+  Glob: "search",
+  Grep: "search",
 
   WebFetch: "network",
   WebSearch: "network",

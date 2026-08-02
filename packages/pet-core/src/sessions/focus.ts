@@ -76,6 +76,26 @@ export function pickFocus(sessions: readonly SessionView[]): SessionView | null 
 }
 
 /**
+ * Every session, in the order the bubble should list them.
+ *
+ * The pet has one body and cannot animate three states at once, so the sprite
+ * follows one session — but the bubble can hold a line each, and then nothing
+ * is hidden. Whoever is waiting on the user comes first, longest wait at the
+ * top; everyone else follows by how recently they did something.
+ */
+export function orderForDisplay(sessions: readonly SessionView[]): readonly SessionView[] {
+  const rank = (s: SessionView) => (needsAttention(s.state) ? 0 : 1);
+  return [...sessions].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (rank(a) === 0
+        ? (a.attentionSince ?? a.lastEventAt) - (b.attentionSince ?? b.lastEventAt)
+        : b.lastEventAt - a.lastEventAt) ||
+      a.sessionId.localeCompare(b.sessionId),
+  );
+}
+
+/**
  * The project name to show, or nothing.
  *
  * With one session the project name is noise — the user knows what they are
