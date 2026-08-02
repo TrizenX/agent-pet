@@ -15,11 +15,12 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:no-agent-strings": "node scripts/lint-no-agent-strings.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && node scripts/generate-hooks-json.mjs --check && pnpm test",
+    "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && pnpm lint:exports && node scripts/generate-hooks-json.mjs --check && pnpm test",
     "dev": "pnpm --filter @agent-pet/pet-core dev",
     "tauri": "pnpm --filter @agent-pet/pet-core tauri",
     "hooks:generate": "node scripts/generate-hooks-json.mjs",
-    "verify:rust": "cargo fmt --manifest-path packages/pet-core/src-tauri/Cargo.toml -- --check && cargo test --manifest-path packages/pet-core/src-tauri/Cargo.toml"
+    "verify:rust": "cargo fmt --manifest-path packages/pet-core/src-tauri/Cargo.toml -- --check && cargo test --manifest-path packages/pet-core/src-tauri/Cargo.toml",
+    "lint:exports": "node scripts/lint-exports.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",
