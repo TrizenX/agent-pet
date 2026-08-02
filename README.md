@@ -20,11 +20,11 @@ A desktop pet that is the embodiment of a running AI coding agent. It digs while
 | | |
 | :-- | :-- |
 | **macOS**, **Windows** | Phase 1 targets. |
-| **Linux · X11** | Best-effort. |
-| **Linux · Wayland** | Likely unsupported — Wayland gives a client no way to position its own window or force always-on-top. Being settled by a spike; no support is claimed until it is. |
+| **Linux · X11** | Best-effort, and now measured: the pet places itself, floats above other windows, passes clicks through, and gets a 32-bit ARGB visual (you need a compositing manager running for that last one to show). Checked on Xvfb + openbox, not on GNOME or KDE. |
+| **Linux · Wayland** | Unsupported, and the app tells you so at startup. Wayland gives a client no way to position its own window or force always-on-top, so the pet would sit in the top-left corner behind whatever you are working in. Log in to an X11 session instead. [Why](artifacts/spike-e/FINDINGS.md). |
 | **iOS / Android** | Out of scope, and not for the obvious reason: the agent runs on your desktop, so a phone cannot receive its hooks at all. The honest mobile shape is a remote notifier over the Phase 3 protocol, not an overlay pet. |
 
-Everything shipped so far is pure TypeScript with no OS assumptions — the platform surface is entirely in the Tauri shell, which is still M1 work. See spec §3.1.
+The platform surface is entirely in the Tauri shell: `protocol`, the adapters and `packs/` are pure TypeScript with no OS assumptions, which is why the Linux build needed no code changes to run. See spec §3.1.
 
 ## Install
 

@@ -17,10 +17,39 @@ pub fn apply_overlay_behaviour(window: &WebviewWindow) {
     #[cfg(not(target_os = "macos"))]
     {
         // Windows: `alwaysOnTop` in tauri.conf.json is sufficient (HWND_TOPMOST).
-        // Linux: see spec §3.1 — under Wayland a client cannot force this at all.
-        // Tracked by TZX-74.
+        // Linux/X11: also sufficient — Spike E confirmed _NET_WM_STATE_ABOVE is
+        // set, and `set_position` and `set_ignore_cursor_events` both work.
         let _ = window;
+        #[cfg(target_os = "linux")]
+        warn_if_wayland();
     }
+}
+
+/// Say out loud what Wayland takes away, once, at startup.
+///
+/// Spike E measured it: under Wayland the app runs and the webview connects,
+/// but `primary_monitor()` returns nothing, so the pet cannot work out where
+/// the corner is and lands at 0,0 — and there is no protocol for a client to
+/// raise itself above other windows at all. That is a deliberate Wayland
+/// decision, not a bug we can fix.
+///
+/// A pet sitting in the top-left corner under everything else looks like a
+/// broken pet. TZX-74's acceptance is explicit that this must never fail
+/// silently, so it does not: the one thing worse than an unsupported platform
+/// is an unsupported platform that pretends.
+#[cfg(target_os = "linux")]
+fn warn_if_wayland() {
+    let wayland = std::env::var("XDG_SESSION_TYPE").is_ok_and(|v| v.eq_ignore_ascii_case("wayland"))
+        || std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty());
+    if !wayland {
+        return;
+    }
+    eprintln!(
+        "[window] this is a Wayland session, where the pet cannot place itself \
+         or stay above other windows — it will sit at the top-left, behind \
+         whatever you are working in. Log in with an X11 session for the \
+         overlay to work. See artifacts/spike-e/FINDINGS.md."
+    );
 }
 
 #[cfg(target_os = "macos")]
