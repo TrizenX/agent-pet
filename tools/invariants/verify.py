@@ -368,7 +368,22 @@ def soak(port: int, root_pid: int, minutes: float) -> Check:
             {"hook_event_name": "PostToolUse", "session_id": sid, "cwd": "/w/p", "tool_name": "Bash"},
             {"hook_event_name": "Stop", "session_id": sid, "cwd": "/w/p"},
         ):
-            post(port, f"/event/{SOURCE}", json.dumps(body).encode())
+            try:
+                post(port, f"/event/{SOURCE}", json.dumps(body).encode())
+            except Exception as e:
+                # The pet died mid-soak. That is the single most interesting
+                # thing a soak can discover, and it used to arrive as a Python
+                # traceback — a crash in the measuring instrument, reported as
+                # if the instrument were the subject. Say what happened, how far
+                # in, and fail.
+                secs = time.time() - (end - minutes * 60)
+                lasted = f"{secs:.0f} s" if secs < 90 else f"{secs / 60:.1f} min"
+                return Check(
+                    "memory stays flat over a long run", "M2 soak", False,
+                    f"the pet stopped answering after {lasted} of {minutes} min "
+                    f"({session} sessions in): {type(e).__name__} {e}",
+                    {"seconds_survived": round(secs, 1), "sessions": session},
+                )
         _, rss = cpu_and_rss(pids)
         samples.append((time.time(), rss))
         time.sleep(5)

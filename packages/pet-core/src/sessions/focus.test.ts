@@ -28,6 +28,28 @@ describe("needsAttention", () => {
     }
   });
 
+  it("includes `waiting_input` — a question is a claim on the user too", () => {
+    // Removing `waiting_input` from ATTENTION_STATES used to pass this whole
+    // file. The state was added to the set in M5 and nothing here noticed,
+    // which meant the feature — a question outranking a busier session — was
+    // untested end to end.
+    expect(needsAttention("waiting_input")).toBe(true);
+  });
+
+  it("ranks a question above a more recently active session", () => {
+    const asking = view("a", "waiting_input", 1_000, { attentionSince: 1_000 });
+    const busy = view("b", "working.digging", 9_000);
+
+    expect(pickFocus([busy, asking])?.sessionId).toBe("a");
+  });
+
+  it("ranks whoever has been waiting longest, question or approval alike", () => {
+    const question = view("a", "waiting_input", 5_000, { attentionSince: 2_000 });
+    const approval = view("b", "waiting_approval", 5_000, { attentionSince: 4_000 });
+
+    expect(pickFocus([approval, question])?.sessionId).toBe("a");
+  });
+
   it("does not include `error`", () => {
     // `error` decays in three seconds and needs nothing from the user; treating
     // it as attention would let a transient failure outrank a real approval.

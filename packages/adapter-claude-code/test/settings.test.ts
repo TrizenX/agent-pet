@@ -43,7 +43,7 @@ describe("installHooks", () => {
   it("adds every event in the block", () => {
     write(USER_SETTINGS);
     const { events } = installHooks(block(), PORT, file);
-    expect(events).toHaveLength(13);
+    expect(events).toHaveLength(17);
     expect(Object.keys(read().hooks).sort()).toEqual(
       [...new Set([...events, "PreCompact"])].sort(),
     );
@@ -79,12 +79,12 @@ describe("installHooks", () => {
   it("creates the hooks object when the file has none", () => {
     write({ model: "opus" });
     installHooks(block(), PORT, file);
-    expect(Object.keys(read().hooks)).toHaveLength(13);
+    expect(Object.keys(read().hooks)).toHaveLength(17);
   });
 
   it("works when the file does not exist at all", () => {
     installHooks(block(), PORT, file);
-    expect(Object.keys(read().hooks)).toHaveLength(13);
+    expect(Object.keys(read().hooks)).toHaveLength(17);
   });
 
   it("backs the file up before writing, and only when there is something to back up", () => {
@@ -109,7 +109,7 @@ describe("uninstallHooks", () => {
     write(USER_SETTINGS);
     installHooks(block(), PORT, file);
     const { removed } = uninstallHooks(PORT, file);
-    expect(removed).toBe(13);
+    expect(removed).toBe(17);
     expect(read().hooks.Stop).toHaveLength(1);
     expect(read().hooks.Stop[0].hooks[0].command).toBe("echo mine");
   });
@@ -134,7 +134,7 @@ describe("uninstallHooks", () => {
     installHooks(block(), PORT, file);
     const { removed } = uninstallHooks(59999, file);
     expect(removed).toBe(0);
-    expect(Object.keys(read().hooks)).toHaveLength(13);
+    expect(Object.keys(read().hooks)).toHaveLength(17);
   });
 
   it("drops the hooks object entirely if we were the only thing in it", () => {
@@ -161,7 +161,7 @@ describe("installedEvents — what doctor reports", () => {
     write(USER_SETTINGS);
     expect(installedEvents(PORT, file)).toEqual([]);
     installHooks(block(), PORT, file);
-    expect(installedEvents(PORT, file)).toHaveLength(13);
+    expect(installedEvents(PORT, file)).toHaveLength(17);
   });
 
   it("ignores the user's own hooks on the same events", () => {

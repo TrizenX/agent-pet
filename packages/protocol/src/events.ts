@@ -78,6 +78,8 @@ export type PetEventBody =
    * and says why beats one that looks stuck.
    */
   | { type: "COMPACTING" }
+  /** Compaction finished. The authoritative end of `COMPACTING`. */
+  | { type: "COMPACTED" }
   | { type: "SUBAGENT_START"; agentType?: string }
   | { type: "SUBAGENT_END" };
 
@@ -98,6 +100,7 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set<PetEventType>([
   "AGENT_BLOCKED",
   "INPUT_NEEDED",
   "COMPACTING",
+  "COMPACTED",
   "SUBAGENT_START",
   "SUBAGENT_END",
 ]);
