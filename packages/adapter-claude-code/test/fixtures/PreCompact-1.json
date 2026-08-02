@@ -1,0 +1,9 @@
+{
+  "session_id": "session-0000",
+  "transcript_path": "/home/user/.agent/transcript.jsonl",
+  "cwd": "/home/user/demo-project",
+  "prompt_id": "prompt-0000",
+  "hook_event_name": "PreCompact",
+  "trigger": "manual",
+  "custom_instructions": null
+}

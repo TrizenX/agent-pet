@@ -60,6 +60,8 @@ const REQUIRED_FIELDS: Record<string, readonly string[]> = {
   // out rather than in a pet that stopped distinguishing delegated work.
   SubagentStart: ["session_id", "hook_event_name", "agent_type"],
   SubagentStop: ["session_id", "hook_event_name"],
+  PreCompact: ["session_id", "hook_event_name"],
+  PostCompact: ["session_id", "hook_event_name"],
 };
 
 describe("recorded fixtures", () => {
