@@ -38,6 +38,12 @@ const EXPECTED: Record<string, string | null> = {
   PermissionDenied: "APPROVAL_RESOLVED",
   Stop: "TURN_END",
   StopFailure: "AGENT_BLOCKED",
+  PreCompact: "COMPACTING",
+  PostCompact: "COMPACTED",
+  SubagentStart: "SUBAGENT_START",
+  SubagentStop: "SUBAGENT_END",
+  Elicitation: "INPUT_NEEDED",
+  ElicitationResult: "AGENT_IDLE",
 };
 
 /** Fields `mapping.ts` reads. If one disappears upstream, this is where we find out. */
@@ -49,6 +55,11 @@ const REQUIRED_FIELDS: Record<string, readonly string[]> = {
   Notification: ["session_id", "hook_event_name", "notification_type"],
   Stop: ["session_id", "hook_event_name"],
   StopFailure: ["session_id", "hook_event_name"],
+  // `agent_type` is what makes SubagentStart worth having over guessing a
+  // delegation from a tool name. If it ever disappears, this is where we find
+  // out rather than in a pet that stopped distinguishing delegated work.
+  SubagentStart: ["session_id", "hook_event_name", "agent_type"],
+  SubagentStop: ["session_id", "hook_event_name"],
 };
 
 describe("recorded fixtures", () => {

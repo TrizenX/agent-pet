@@ -113,7 +113,7 @@ async function cmdDoctor(argv: readonly string[]): Promise<number> {
   console.log(
     `hooks     ${
       installed.length > 0
-        ? `${installed.length}/11 events in ${SETTINGS_PATH}`
+        ? `${installed.length}/${Object.keys(hooksFor(port)).length} events in ${SETTINGS_PATH}`
         : `none in ${SETTINGS_PATH}`
     }`,
   );

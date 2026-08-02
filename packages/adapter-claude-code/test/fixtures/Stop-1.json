@@ -7,10 +7,9 @@
   "effort": {
     "level": "<redacted:string:4>"
   },
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Read",
-  "tool_input": {
-    "file_path": "<redacted:string:105>"
-  },
-  "tool_use_id": "toolu_0000"
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "<redacted:string:933>",
+  "background_tasks": [],
+  "session_crons": []
 }
