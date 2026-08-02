@@ -34,10 +34,16 @@ rm -rf packages/pet-core/{dist,node_modules/.vite}   # see vite.config.ts
 pnpm verify                                    # typecheck, lint, I5, hooks drift, tests
 pnpm verify:rust                               # rustfmt --check, then cargo test
 pnpm --filter @agent-pet/pet-core tauri build --no-bundle
+python3 tools/smoke/load.py        --binary packages/pet-core/src-tauri/target/release/agent-pet
 python3 tools/layout/check.py      --binary packages/pet-core/src-tauri/target/release/agent-pet
 python3 tools/layout/fullscreen.py --binary packages/pet-core/src-tauri/target/release/agent-pet
 node packages/adapter-claude-code/src/cli.ts record --install   # re-record fixtures
 python3 tools/invariants/verify.py --binary … --soak-minutes 480
 ```
+
+Three harnesses, three different questions. `pnpm verify` asks whether the logic
+is right; `tools/layout` asks whether what it draws can be seen; `tools/smoke`
+asks whether it stays up. The third was added after a bug that passed the first
+two and wedged the app after thirty events.
 
 Re-recording the fixtures is not optional. The hook schema has already moved once under us — `PostToolUse` lost the `is_error` the documentation still lists — and the fixtures are the only thing that notices.
