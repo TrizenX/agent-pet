@@ -18,6 +18,8 @@ my-pet/
 
 Clean integer scales of either are accepted. Rows 9 and 10 of a v2 sheet are undocumented upstream and unused here.
 
+Integer upscales of either grid are accepted, up to 4×. Past that a single sheet costs more memory than the whole app and the frame scan stalls the render thread, so it is refused with a reason rather than loaded slowly.
+
 **Frame counts are per sheet, not per format.** Leave trailing cells transparent and the loader counts what is actually drawn — the common vector is `[6, 8, 8, 4, 5, 8, 6, 6, 6]`, but some packs pad every row to 8 and both work. Nothing is assumed; see [Spike D](../artifacts/spike-d/FINDINGS.md).
 
 ## Which rows the pet uses
@@ -31,7 +33,7 @@ Clean integer scales of either are accepted. Rows 9 and 10 of a v2 sheet are und
 | 4 | `jumping` | `attentive`, `celebrating` | |
 | 5 | `failed` | `error`, `exhausted` | |
 | 6 | `waiting` | `sleeping` | rendered as a single static frame, no animation |
-| 7 | `running` | **`working.typing`** — a file edit | see below |
+| 7 | `running` | **`working.typing`** — a file edit, and any tool we did not classify | see below |
 | 8 | `review` | **`working.reading`** — a file read or search | inspection reads best; a magnifier works well |
 
 ### Row 7 is worth a paragraph
@@ -39,6 +41,8 @@ Clean integer scales of either are accepted. Rows 9 and 10 of a v2 sheet are und
 Upstream documents it as a generic in-place run loop. In practice authors disagree: `frog` draws itself at a laptop, `slime` changes expression slightly, `boba` is near-indistinguishable from idle.
 
 We use it for *typing*, because the authors who interpreted it drew working-at-a-computer. If you are drawing a pack for Agent Pet specifically, that is the reading to follow.
+
+It is also the fallback for tool activity we could not classify, so in practice it is on screen more than any other working row. Worth more frames than its neighbours.
 
 ### Rows 3, 5 and 6 carry the most weight
 

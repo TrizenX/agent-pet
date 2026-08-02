@@ -15,6 +15,14 @@ use crate::window;
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
+    /// What was on disk at startup.
+    ///
+    /// Scanned once, in `setup`, and shared with the frontend from here. The
+    /// tray and the webview have to agree on the id of every pack — the tray
+    /// writes the selection and the webview looks it up — and two independent
+    /// scans is one more way for them to disagree. It also halves the startup
+    /// disk I/O, which happens on the main thread before the window is shown.
+    pub packs: Vec<crate::packs::DiscoveredPack>,
 }
 
 /// Scales offered in the Size submenu. Anything else is a data change.
@@ -24,7 +32,11 @@ fn pet<R: Runtime>(app: &AppHandle<R>) -> Option<tauri::WebviewWindow<R>> {
     app.get_webview_window("pet")
 }
 
-pub fn build(app: &AppHandle, initial: &Settings) -> tauri::Result<()> {
+pub fn build(
+    app: &AppHandle,
+    initial: &Settings,
+    packs: &[crate::packs::DiscoveredPack],
+) -> tauri::Result<()> {
     let show =
         CheckMenuItem::with_id(app, "show", "Show pet", true, !initial.hidden, None::<&str>)?;
     let click_through = CheckMenuItem::with_id(
@@ -88,15 +100,23 @@ pub fn build(app: &AppHandle, initial: &Settings) -> tauri::Result<()> {
         initial.pack.is_empty(),
         None::<&str>,
     )?];
-    for found in crate::packs::discover(app) {
-        pack_items.push(CheckMenuItem::with_id(
+    for found in packs {
+        // Not `?`. `packs.rs` goes to some trouble to skip a bad entry rather
+        // than fail the scan, and propagating from here would throw that away:
+        // `build` is called with `?` from `setup`, so one unrepresentable menu
+        // label — from a directory name in a root we do not control — would
+        // stop the app from starting at all.
+        match CheckMenuItem::with_id(
             app,
             format!("pack:{}", found.id),
             format!("{}  ({})", found.id, found.root),
             true,
             initial.pack == found.id,
             None::<&str>,
-        )?);
+        ) {
+            Ok(item) => pack_items.push(item),
+            Err(e) => println!("[packs] no menu item for {}: {e}", found.id),
+        }
     }
     let choose_pet = Submenu::with_id_and_items(
         app,

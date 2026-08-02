@@ -5,6 +5,7 @@ import {
   classifyGeometry,
   FRAME_HEIGHT,
   FRAME_WIDTH,
+  MAX_SCALE,
   MODAL_FRAME_COUNTS_V1,
   measureFrameCounts,
   ROW_INDEX,
@@ -65,6 +66,17 @@ describe("classifyGeometry", () => {
       frameWidth: 384,
       frameHeight: 416,
     });
+  });
+
+  it("refuses a scale past the decode ceiling", () => {
+    // Legal by every other rule, and 2.9 GB of pixels once decoded. Memory is
+    // quadratic in scale, so the ceiling has to be here rather than in a
+    // caller's judgement.
+    expect(classifyGeometry(1536 * MAX_SCALE, 1872 * MAX_SCALE)).toMatchObject({
+      scale: MAX_SCALE,
+    });
+    expect(classifyGeometry(1536 * (MAX_SCALE + 1), 1872 * (MAX_SCALE + 1))).toBeNull();
+    expect(classifyGeometry(1536 * 16, 1872 * 16)).toBeNull();
   });
 
   it.each([
