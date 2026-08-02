@@ -6,7 +6,7 @@ import {
   type PetEvent,
   type PetEventBody,
 } from "@agent-pet/protocol";
-import { classifyTool } from "./tools.ts";
+import { classifyTool, describeTool } from "./tools.ts";
 
 export const ADAPTER_ID = "claude-code";
 
@@ -16,6 +16,7 @@ interface RawHook {
   session_id?: unknown;
   cwd?: unknown;
   tool_name?: unknown;
+  tool_input?: unknown;
   is_error?: unknown;
   is_interrupt?: unknown;
   notification_type?: unknown;
@@ -54,8 +55,10 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
     case "UserPromptSubmit":
       return [{ type: "PROMPT_SUBMITTED" }];
 
-    case "PreToolUse":
-      return [{ type: "TOOL_START", tool }];
+    case "PreToolUse": {
+      const label = describeTool(raw.tool_name, raw.tool_input);
+      return [{ type: "TOOL_START", tool, ...(label ? { label } : {}) }];
+    }
     case "PostToolUse":
       // Spike B: `is_error` is documented but was never present in any recorded
       // payload — real failures arrive as `PostToolUseFailure` instead. Kept as

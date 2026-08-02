@@ -15,6 +15,7 @@ export function SpeechBubble({
   locale = "en",
   overrides,
   activity,
+  activityLabel,
 }: {
   readonly state: PetState;
   readonly project?: string | undefined;
@@ -22,8 +23,10 @@ export function SpeechBubble({
   readonly overrides?: Partial<Record<PetState, string>>;
   /** The kind of work in flight, when there is any. Refines the state word. */
   readonly activity?: ToolKind | null;
+  /** What that work is on. Supplied by the adapter; rendered as plain text. */
+  readonly activityLabel?: string | null;
 }) {
-  const text = speechFor(state, locale, overrides, activity);
+  const text = speechFor(state, locale, overrides, activity, activityLabel);
   if (!text) return null;
   return (
     <div className="pet-bubble" role="status">

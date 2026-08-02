@@ -28,14 +28,10 @@ body {
   height: 100%;
   display: grid;
   place-items: end center;
-  cursor: grab;
-}
-
-.pet-root:active {
-  cursor: grabbing;
 }
 
 .pet-sprite {
+  cursor: grab;
   background-repeat: no-repeat;
   /* Integer-scaled pixel art: smoothing turns 192×208 frames to mush. */
   image-rendering: pixelated;
@@ -80,10 +76,16 @@ body {
   top: 2px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 92%;
+  /* The window is deliberately much wider than the pet so this has room. It
+     was 208px — narrower than "Running pnpm verify" — and the bubble was
+     clipped at the window edge, which looked exactly like the pet only ever
+     saying "Running…". */
+  max-width: calc(100% - 8px);
   padding: 3px 9px;
   border-radius: 999px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: #fff;
   background: rgb(0 0 0 / 0.78);
 }

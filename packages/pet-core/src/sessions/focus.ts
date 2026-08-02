@@ -38,6 +38,8 @@ export interface SessionView {
   readonly blockedReason: string | null;
   /** The kind of work in flight, when there is any. Drives the bubble. */
   readonly activity: ToolKind | null;
+  /** What that work is on — a filename, a command, a search term. */
+  readonly activityLabel: string | null;
 }
 
 /**

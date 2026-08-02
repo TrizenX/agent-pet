@@ -15,6 +15,7 @@ function view(
     lastEventAt,
     blockedReason: null,
     activity: null,
+    activityLabel: null,
     ...extra,
   };
 }

@@ -32,12 +32,13 @@ export function resolveLocale(
 export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>> = {
   en: {
     attentive: "Hmm…",
-    // The general case, for the gap between two tool calls. An activity refines
-    // it whenever one is actually in flight.
-    "working.generic": "On it!",
-    "working.typing": "On it!",
-    "working.digging": "On it!",
-    "working.reading": "On it!",
+    // The gap between two tool calls, which is the model deciding what to do
+    // next — so it says that. It used to say "On it!", which is the vaguest
+    // possible answer to the one question the bubble exists to answer.
+    "working.generic": "Thinking…",
+    "working.typing": "Thinking…",
+    "working.digging": "Thinking…",
+    "working.reading": "Thinking…",
     "working.delegating": "Sent a friend…",
     compacting: "Tidying up…",
     waiting_input: "Well?",
@@ -48,10 +49,10 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
   },
   vi: {
     attentive: "Ừm…",
-    "working.generic": "Làm đây!",
-    "working.typing": "Làm đây!",
-    "working.digging": "Làm đây!",
-    "working.reading": "Làm đây!",
+    "working.generic": "Đang nghĩ…",
+    "working.typing": "Đang nghĩ…",
+    "working.digging": "Đang nghĩ…",
+    "working.reading": "Đang nghĩ…",
     "working.delegating": "Nhờ bạn rồi…",
     compacting: "Dọn dẹp tí…",
     waiting_input: "Sao nào?",
@@ -70,29 +71,35 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
  * exactly the coupling I5 forbids, and exactly the kind the lint cannot catch,
  * because there would be no string in the source to grep for.
  *
- * Seven words, so a reader learns them once — and pet words rather than status
- * words. "Sniffing" for a search and "Fetching" for a download because the
- * thing on screen is an animal, not a progress bar. They still say what is
- * happening: a pet that is charming and uninformative is just clutter.
+ * A verb, which the adapter's label completes: "Running" + "pnpm test".
+ *
+ * These were standalone words once — "Crunching…", "Hì hục…" — chosen to sound
+ * like an animal rather than a progress bar. They were charming and they said
+ * nothing, which is the worse failure of the two: the bubble exists to answer
+ * "what is it doing", and "toiling away" is not an answer when the terminal
+ * beside it already says the pet is busy.
+ *
+ * The trailing ellipsis lives in the no-label fallback, not here, so a labelled
+ * line reads as a phrase rather than a trailing-off one.
  */
 export const ACTIVITY_STRINGS: Readonly<Record<Locale, Record<ToolKind, string>>> = {
   en: {
-    bash: "Crunching…",
-    file_edit: "Scribbling…",
-    file_read: "Peeking…",
-    search: "Sniffing…",
-    network: "Fetching!",
-    delegate: "Teamwork…",
-    other: "Tinkering…",
+    bash: "Running",
+    file_edit: "Editing",
+    file_read: "Reading",
+    search: "Searching",
+    network: "Fetching",
+    delegate: "Delegating",
+    other: "Working",
   },
   vi: {
-    bash: "Hì hục…",
-    file_edit: "Nắn nót…",
-    file_read: "Ngó tí…",
-    search: "Đánh hơi…",
-    network: "Tha về…",
-    delegate: "Sai vặt…",
-    other: "Loay hoay…",
+    bash: "Chạy",
+    file_edit: "Sửa",
+    file_read: "Đọc",
+    search: "Tìm",
+    network: "Tải",
+    delegate: "Giao",
+    other: "Làm",
   },
 };
 
@@ -117,6 +124,7 @@ export function speechFor(
   locale: Locale = "en",
   overrides?: Partial<Record<PetState, string>>,
   activity?: ToolKind | null,
+  label?: string | null,
 ): string | undefined {
   // A pack's override wins outright. Someone who wrote their own line for a
   // state meant it, including while a tool is running.
@@ -124,7 +132,10 @@ export function speechFor(
   if (override) return override;
 
   if (activity && ACTIVITY_STATES.has(state)) {
-    return ACTIVITY_STRINGS[locale][activity] ?? ACTIVITY_STRINGS.en[activity];
+    const verb = ACTIVITY_STRINGS[locale][activity] ?? ACTIVITY_STRINGS.en[activity];
+    // Without a label the verb has to stand alone, so it gets the ellipsis
+    // back. With one, the label is the point.
+    return label ? `${verb} ${label}` : `${verb}…`;
   }
   return STRINGS[locale][state] ?? STRINGS.en[state];
 }
