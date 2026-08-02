@@ -81,6 +81,12 @@ body {
      renderer, so the gap stays 6px at every size. */
   bottom: calc(var(--pet-h, 208px) + 6px);
   left: 50%;
+  /* Size to the content first, then cap.
+     With `left: 50%` and `right: auto` the available width is only the half of
+     the window to the right of centre, so the bubble was shrinking to 210px and
+     ellipsising a line that had 412px to live in — `max-width` never got a say.
+     `max-content` sizes it to the text, and the cap then applies to that. */
+  width: max-content;
   transform: translateX(-50%);
   /* The window is deliberately much wider than the pet so this has room. It
      was 208px — narrower than "Running pnpm verify" — and the bubble was
@@ -119,6 +125,12 @@ body {
 .pet-bubble-line[data-attention] {
   color: #ffd48a;
   font-weight: 600;
+}
+
+/* A session that has been quiet for a minute and a half is still listed, but it
+   should not read as loudly as one doing work right now. */
+.pet-bubble-line[data-quiet] {
+  opacity: 0.5;
 }
 
 /* The project name is shown in full.

@@ -112,11 +112,15 @@ export function App() {
   // the same values. Capped: past a handful of rows the bubble stops being a
   // glance target, and the sessions beyond the cap are the least urgent ones by
   // construction — `orderForDisplay` puts whoever is waiting at the top.
+  // One session gets the pet's voice; several get a table. A chatty line is
+  // lovely on its own and five of them are a wall of text.
+  const chatty = snapshot.sessions.length === 1;
   const lines = snapshot.sessions.slice(0, MAX_BUBBLE_LINES).map((s) => ({
     id: s.sessionId,
     project: s.project,
-    text: speechFor(s.state, locale, undefined, s.activity, s.activityLabel) ?? "…",
+    text: speechFor(s.state, locale, undefined, s.activity, s.activityLabel, chatty) ?? "…",
     attention: needsAttention(s.state),
+    quiet: s.state === "sleeping",
   }));
   const said = lines.map((l) => l.text).join(" | ");
   useEffect(() => {

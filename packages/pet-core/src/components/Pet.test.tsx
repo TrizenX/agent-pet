@@ -193,7 +193,7 @@ describe("what the pet says", () => {
 
   it("speaks Vietnamese when asked", () => {
     expect(speechFor("exhausted", "vi")).toMatch(/Hết pin/);
-    expect(speechFor("working.digging", "vi", undefined, "search", "TODO")).toBe("Tìm TODO");
+    expect(speechFor("working.digging", "vi", undefined, "search", "TODO")).toBe("Lục TODO");
   });
 });
 
@@ -241,5 +241,71 @@ describe("SpeechBubble", () => {
   it("omits the project name when there is only one line to tell apart", () => {
     render(<SpeechBubble lines={[line("a", "Running pnpm test", { project: "agent-pet" })]} />);
     expect(screen.queryByText("agent-pet")).toBeNull();
+  });
+});
+
+describe("a session that has finished and is waiting on you", () => {
+  it("says so, rather than trailing off", () => {
+    // The end of a turn lands in `idle`, which had no string at all — so a
+    // session that had finished its work and was waiting for the next
+    // instruction rendered as "…". In a list of sessions that is the single
+    // most useful line there is: it says which ones want a human.
+    expect(speechFor("idle", "en")).toBe("Your turn");
+    expect(speechFor("idle", "vi")).toBe("Xong, tới bạn");
+  });
+
+  it("still says something once it has dozed off", () => {
+    expect(speechFor("sleeping", "en")).toBe("Asleep");
+    expect(speechFor("sleeping", "vi")).toBe("Zzz…");
+  });
+
+  it("dims a sleeping line so it does not compete with live work", () => {
+    render(
+      <SpeechBubble
+        lines={[
+          { id: "a", project: "agent-pet", text: "Running pnpm verify" },
+          { id: "b", project: "viparse", text: "Asleep", quiet: true },
+        ]}
+      />,
+    );
+    expect(document.querySelectorAll(".pet-bubble-line[data-quiet]")).toHaveLength(1);
+  });
+});
+
+describe("the pet's voice", () => {
+  // A single session gets the whole bubble, so it can comment on the work
+  // instead of labelling it. Five sessions get a table, which has to scan.
+  it("talks when it is the only one on screen", () => {
+    expect(speechFor("working.typing", "vi", undefined, "file_edit", "engine.ts", true)).toBe(
+      "Đụng vào engine.ts nè, hồi hộp ghê",
+    );
+    expect(speechFor("working.typing", "en", undefined, "file_edit", "engine.ts", true)).toBe(
+      "Poking at engine.ts, wish me luck",
+    );
+  });
+
+  it("goes terse the moment there is a list to scan", () => {
+    expect(speechFor("working.typing", "vi", undefined, "file_edit", "engine.ts", false)).toBe(
+      "Sửa engine.ts",
+    );
+  });
+
+  it("has a voice for the states that carry no label either", () => {
+    expect(speechFor("waiting_approval", "vi", undefined, null, null, true)).toBe(
+      "Cho mình làm cái này nha?",
+    );
+    expect(speechFor("waiting_approval", "vi")).toBe("Xin phép nha?");
+  });
+
+  it("falls back to the terse line rather than saying nothing", () => {
+    // `error` has both; a state with only a terse entry must still speak.
+    expect(speechFor("error", "vi", undefined, null, null, true)).toBe("Toang rồi, xin lỗi nha");
+    expect(speechFor("sleeping", "vi", undefined, null, null, true)).toBe("Zzz…");
+  });
+
+  it("still lets a pack override win", () => {
+    expect(
+      speechFor("working.typing", "vi", { "working.typing": "ribbit" }, "file_edit", "x", true),
+    ).toBe("ribbit");
   });
 });
