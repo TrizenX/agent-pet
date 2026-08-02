@@ -16,6 +16,7 @@ import { loadDefaultPack } from "./packs/defaultPack.ts";
 import { loadInstalledPacks } from "./packs/discovery.ts";
 import type { LoadedPack } from "./packs/loader.ts";
 import { resolveLocale, speechFor } from "./packs/strings.ts";
+import { needsAttention } from "./sessions/focus.ts";
 
 /**
  * The whole pet.
@@ -24,6 +25,9 @@ import { resolveLocale, speechFor } from "./packs/strings.ts";
  * glyph, a word, and a session count. Everything above the sprite is ours,
  * because a pack cannot be trusted to make state legible (Spike D · F5).
  */
+
+/** Past this the bubble stops being something you can read at a glance. */
+const MAX_BUBBLE_LINES = 5;
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(
@@ -105,8 +109,17 @@ export function App() {
   const activity = snapshot.focused?.activity ?? null;
   const activityLabel = snapshot.focused?.activityLabel ?? null;
   const locale = resolveLocale(shell.locale);
-  // Derived once, here, and both rendered and logged from the same value.
-  const said = speechFor(state, locale, undefined, activity, activityLabel);
+  // One line per live session, derived once and both rendered and logged from
+  // the same values. Capped: past a handful of rows the bubble stops being a
+  // glance target, and the sessions beyond the cap are the least urgent ones by
+  // construction — `orderForDisplay` puts whoever is waiting at the top.
+  const lines = snapshot.sessions.slice(0, MAX_BUBBLE_LINES).map((s) => ({
+    id: s.sessionId,
+    project: s.project,
+    text: speechFor(s.state, locale, undefined, s.activity, s.activityLabel) ?? "…",
+    attention: needsAttention(s.state),
+  }));
+  const said = lines.map((l) => l.text).join(" | ");
   useEffect(() => {
     // The spoken line too, not just the state. What the pet *says* is the part
     // a user reports, and this is provably that string rather than a second
@@ -142,7 +155,7 @@ export function App() {
 
   return (
     <div className="pet-root">
-      <SpeechBubble text={said} project={snapshot.label} />
+      <SpeechBubble lines={lines} />
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
       <Pet
