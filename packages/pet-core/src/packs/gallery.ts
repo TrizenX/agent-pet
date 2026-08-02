@@ -24,6 +24,49 @@ import { buildPack, describeProblem, parsePetJson } from "./loader.ts";
 
 const MANIFEST_URL = "https://petdex.dev/api/manifest";
 
+/**
+ * Hosts the production CSP's `connect-src` permits.
+ *
+ * Duplicated from `tauri.conf.json` on purpose. The CSP is the thing that
+ * actually enforces this — it is the only layer stopping a manifest from
+ * pointing `spritesheetUrl` at `file://` or any other host — but a CSP refusal
+ * surfaces in the webview as a generic `TypeError`, indistinguishable from
+ * being offline. Checking first turns "could not download it" into a sentence
+ * that names the host, which is what someone would need if the gallery ever
+ * moves its CDN.
+ */
+const ALLOWED_HOSTS = ["petdex.dev", "assets.petdex.dev"];
+
+/** Nothing waits forever. A stalled socket is commoner than a refused one. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * The largest sheet we will pull down.
+ *
+ * Must match `MAX_SHEET_BYTES` in `gallery.rs`, which is the enforcing copy.
+ * This one exists so the refusal happens before the bytes are in memory rather
+ * than after. The geometry check is *not* a size check: a PNG at a perfectly
+ * ordinary 1536×1872 can carry megabytes in an ancillary chunk that every
+ * decoder skips, so the pixels prove nothing about the file.
+ */
+const MAX_SHEET_BYTES = 8 * 1024 * 1024;
+
+function allowed(url: string): boolean {
+  try {
+    return ALLOWED_HOSTS.includes(new URL(url).host);
+  } catch {
+    return false;
+  }
+}
+
+/** `fetch`, but it gives up. */
+async function get(url: string): Promise<Response> {
+  if (!allowed(url)) {
+    throw new Error(`${url} is not a host this build is allowed to reach`);
+  }
+  return fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+}
+
 export interface GalleryEntry {
   readonly slug: string;
   readonly displayName: string;
@@ -96,7 +139,7 @@ export async function loadGalleryIndex(): Promise<GalleryIndex> {
 
   let text: string;
   try {
-    const response = await fetch(MANIFEST_URL);
+    const response = await get(MANIFEST_URL);
     if (!response.ok) {
       return { entries: [], cached: false, error: `the gallery answered ${response.status}` };
     }
@@ -141,8 +184,8 @@ export async function installFromGallery(entry: GalleryEntry): Promise<InstallRe
   let sheetBlob: Blob;
   try {
     const [manifestResponse, sheetResponse] = await Promise.all([
-      fetch(entry.petJsonUrl),
-      fetch(entry.spritesheetUrl),
+      get(entry.petJsonUrl),
+      get(entry.spritesheetUrl),
     ]);
     if (!manifestResponse.ok || !sheetResponse.ok) {
       return {
@@ -150,10 +193,25 @@ export async function installFromGallery(entry: GalleryEntry): Promise<InstallRe
         reason: `download failed (${manifestResponse.status}/${sheetResponse.status})`,
       };
     }
+
+    // Refuse on the declared length before reading the body, when the server
+    // is honest enough to declare one.
+    const declared = Number(sheetResponse.headers?.get?.("content-length") ?? 0);
+    if (declared > MAX_SHEET_BYTES) {
+      return { ok: false, reason: `the spritesheet is ${declared} bytes, which is too large` };
+    }
+
     petJson = await manifestResponse.text();
     sheetBlob = await sheetResponse.blob();
-  } catch {
-    return { ok: false, reason: "could not download it — check the connection" };
+  } catch (e) {
+    // Covers offline, a refused connection, a host outside the allowlist, and
+    // the timeout — all of which used to be the same silent shrug.
+    return { ok: false, reason: `could not download it: ${e instanceof Error ? e.message : e}` };
+  }
+
+  // And on the real length, for a server that was not.
+  if (sheetBlob.size > MAX_SHEET_BYTES) {
+    return { ok: false, reason: `the spritesheet is ${sheetBlob.size} bytes, which is too large` };
   }
 
   const manifest = parsePetJson(petJson);
@@ -178,7 +236,7 @@ export async function installFromGallery(entry: GalleryEntry): Promise<InstallRe
     await invoke("install_pack", {
       slug: entry.slug,
       petJson,
-      sheet: Array.from(new Uint8Array(await sheetBlob.arrayBuffer())),
+      sheetBase64: base64(await sheetBlob.arrayBuffer()),
       sheetName,
     });
   } catch (e) {
@@ -186,4 +244,24 @@ export async function installFromGallery(entry: GalleryEntry): Promise<InstallRe
   }
 
   return { ok: true, id: entry.slug };
+}
+
+/**
+ * Bytes for the IPC boundary.
+ *
+ * Not `Array.from(new Uint8Array(...))`. Tauri only takes its raw-bytes fast
+ * path when the whole invoke payload is a typed array, which it never is for a
+ * command with named arguments — so an array of bytes is serialised as a JSON
+ * list of decimal numbers. Measured at fifteen to twenty times the source: an
+ * 8 MB sheet became a 154 MB array and a 30-million-character string. Base64 is
+ * 1.33×, and `btoa` needs chunking because the argument list has a limit.
+ */
+function base64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }

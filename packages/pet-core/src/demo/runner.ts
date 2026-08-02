@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { stopListening } from "../events.ts";
 import { PRE_NORMALISED_SOURCE } from "../pipeline.ts";
 import { beatToEvent, scenarioById } from "./scenarios.ts";
 
@@ -50,7 +51,7 @@ export function listenForScenarios(): () => void {
   });
   return () => {
     cancel?.();
-    void unlisten.then((off) => off()).catch(() => {});
+    stopListening(unlisten, "demo-scenario");
   };
 }
 
