@@ -28,7 +28,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPCONFIG/packs/**", "$HOME/.petdex/pets/**", "$HOME/.codex/pets/**"]
+      }
     },
     "trayIcon": {
       "id": "pet",

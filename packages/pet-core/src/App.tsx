@@ -10,6 +10,7 @@ import { listenForScenarios } from "./demo/runner.ts";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
 import { useShellSettings } from "./hooks/useShellSettings.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
+import { loadInstalledPacks } from "./packs/discovery.ts";
 import type { LoadedPack } from "./packs/loader.ts";
 
 /**
@@ -57,10 +58,20 @@ export function App() {
     };
   }, []);
 
+  const [installed, setInstalled] = useState<readonly LoadedPack[]>([]);
+
   useEffect(() => {
     let live = true;
     void loadDefaultPack().then((p) => {
       if (live) setPack(p);
+    });
+    void loadInstalledPacks().then(({ packs, rejected }) => {
+      if (!live) return;
+      setInstalled(packs);
+      // A broken pack costs a log line, not the pet (I4). Named, so the user
+      // can tell which of their packs is the problem.
+      console.log(`[packs] ${packs.length} loaded, ${rejected.length} skipped`);
+      for (const r of rejected) console.warn(`[packs] skipped ${r.id}: ${r.reason}`);
     });
     return () => {
       live = false;
@@ -82,12 +93,16 @@ export function App() {
   // be more visible than the pet it is standing in for.
   if (!pack) return null;
 
+  // The tray's choice, falling back to the built-in pet if that pack has since
+  // been uninstalled or turned out to be unreadable.
+  const active = installed.find((p) => p.id === shell.pack) ?? pack;
+
   return (
     <div className="pet-root" data-tauri-drag-region>
       <SpeechBubble state={state} project={snapshot.label} />
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
-      <Pet pack={pack} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
+      <Pet pack={active} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
       <EventLog entries={log} open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
   );

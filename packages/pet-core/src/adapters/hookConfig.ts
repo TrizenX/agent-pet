@@ -18,5 +18,7 @@ export async function copyHookConfig(): Promise<void> {
   );
   if (blocks.length === 0) return;
 
-  await invoke("copy_text", { text: blocks.join("\n\n") });
+  await invoke("copy_text", { text: blocks.join("\n\n") }).catch((e) => {
+    console.error(`[hooks] copy failed: ${e instanceof Error ? e.message : e}`);
+  });
 }

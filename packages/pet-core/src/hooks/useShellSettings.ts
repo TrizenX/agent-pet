@@ -17,6 +17,8 @@ export interface ShellSettings {
   readonly glyphs_enabled: boolean;
   readonly scale: number;
   readonly hidden: boolean;
+  /** Pack id, or empty for the built-in pet. */
+  readonly pack: string;
 }
 
 const DEFAULTS: ShellSettings = {
@@ -24,6 +26,7 @@ const DEFAULTS: ShellSettings = {
   glyphs_enabled: true,
   scale: 1,
   hidden: false,
+  pack: "",
 };
 
 export function useShellSettings(): ShellSettings {
@@ -39,8 +42,12 @@ export function useShellSettings(): ShellSettings {
       .then((s) => {
         if (live) setSettings({ ...DEFAULTS, ...s });
       })
-      .catch(() => {
-        // Running outside the shell, e.g. `vite` on its own.
+      .catch((e) => {
+        // Swallowing this hid an unregistered command for two milestones: the
+        // saved scale and glyph preference silently never arrived and the app
+        // looked merely under-featured. Outside the shell it is expected, so
+        // it warns rather than throws — but it does say something.
+        console.warn(`[settings] get_settings failed: ${e instanceof Error ? e.message : e}`);
       });
 
     const unlisten = listen<ShellSettings>("pet-settings", (e) =>
