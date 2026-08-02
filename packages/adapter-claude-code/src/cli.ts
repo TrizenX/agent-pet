@@ -128,6 +128,12 @@ async function cmdDoctor(argv: readonly string[]): Promise<number> {
   } else if (!healthy) {
     console.log("\nHooks are wired but nothing is listening. Start the pet, or if it is");
     console.log("running on another port, reinstall the hooks with --port.");
+  } else {
+    // Set up and working. Saying nothing here, and then printing a block to
+    // paste, read as though work remained — which is the one question this
+    // command exists to answer.
+    console.log("\nSet up. New sessions will drive the pet; this one keeps whatever");
+    console.log("hooks it started with.");
   }
 
   // §5.4 asks doctor for two things: which path is active, and the correct
@@ -136,8 +142,15 @@ async function cmdDoctor(argv: readonly string[]): Promise<number> {
   // run `doctor --port N` precisely to get the block. Printing it is also the
   // whole answer for a non-default port, which is the case D9 refuses to
   // paper over.
-  console.log("\nHooks for this port — paste into the `hooks` object of that file:\n");
-  console.log(claudeCodeAdapter.hookConfig?.(ourUrl(port)) ?? "");
+  //
+  // Not printed when everything is already wired, though: an unasked-for block
+  // of configuration under a green report is an instruction, and there is
+  // nothing left to do.
+  const wired = healthy && (plugin || installed.length > 0);
+  if (!wired || port !== DEFAULT_PORT) {
+    console.log("\nHooks for this port — paste into the `hooks` object of that file:\n");
+    console.log(claudeCodeAdapter.hookConfig?.(ourUrl(port)) ?? "");
+  }
 
   return healthy && (plugin || installed.length > 0) ? 0 : 1;
 }
