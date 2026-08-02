@@ -37,10 +37,11 @@ body {
   image-rendering: pixelated;
 }
 
+/* At the pet's shoulder, not the window's corner. */
 .pet-glyph {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  bottom: calc(var(--pet-h, 208px) - 34px);
+  right: calc(50% - var(--pet-w, 192px) / 2 - 10px);
   width: 30px;
   height: 30px;
   display: grid;
@@ -130,8 +131,8 @@ body {
 
 .pet-badge {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  bottom: calc(var(--pet-h, 208px) - 30px);
+  left: calc(50% - var(--pet-w, 192px) / 2 - 10px);
   min-width: 20px;
   height: 20px;
   padding: 0 5px;
