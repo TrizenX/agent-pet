@@ -6,7 +6,16 @@
 
 ---
 
-## Verdict: **PASSED**
+## Verdict: **PASSED** — and, as of 2026-08-02, photographed
+
+This spike proved the fix by asking the window server whether our window was
+onscreen and at layer 25. That is good evidence and it stops one step short: the
+window server will call a window onscreen while it draws nothing anyone could
+see. `tools/layout/fullscreen.py` closes the gap — it drives a real full-screen
+Space, captures the screen with the pet running and again a second after killing
+it, and diffs the pet's rectangle between the two frames. **8.6 % of that
+rectangle was the pet; the untouched page beside it differed by 0.0 %.**
+
 
 The fix is **re-classing the Tauri `NSWindow` as a non-activating `NSPanel`**. Collection behaviour and window level are necessary but were never sufficient; the class is what decides whether the window server treats the window as auxiliary chrome that follows the user, or as a document window that belongs to one Space.
 

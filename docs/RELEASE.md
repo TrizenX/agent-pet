@@ -21,7 +21,7 @@ waiting on something outside the repository.
 | **An *interactive* agent session.** A headless one now drives the pet end to end (see [`artifacts/real-session/FINDINGS.md`](../artifacts/real-session/FINDINGS.md)) — but `-p` never emits a permission prompt, so `waiting_approval` and `exhausted`, the two highest-value states, remain unproven against a real agent. That needs a human at a keyboard. |
 | **`StopFailure` recorded from a real rate limit** (TZX-63). It is the sole input to `exhausted`, and that state has never been driven by a genuine event. |
 | **Release-build numbers.** Every measurement in `artifacts/` is a debug build. |
-| **One visual confirmation of the overlay** over a full-screen app. `tools/layout/check.py` now measures the bubble against the real window on every run and photographs it, but the full-screen case specifically has still not been exercised. |
+| ~~One visual confirmation of the overlay over a full-screen app.~~ Done — `tools/layout/fullscreen.py` drives a real full-screen Space and measures what the pet drew there. |
 
 ## Not blocking
 
@@ -34,7 +34,8 @@ rm -rf packages/pet-core/{dist,node_modules/.vite}   # see vite.config.ts
 pnpm verify                                    # typecheck, lint, I5, hooks drift, tests
 pnpm verify:rust                               # rustfmt --check, then cargo test
 pnpm --filter @agent-pet/pet-core tauri build --no-bundle
-python3 tools/layout/check.py --binary packages/pet-core/src-tauri/target/release/agent-pet
+python3 tools/layout/check.py      --binary packages/pet-core/src-tauri/target/release/agent-pet
+python3 tools/layout/fullscreen.py --binary packages/pet-core/src-tauri/target/release/agent-pet
 node packages/adapter-claude-code/src/cli.ts record --install   # re-record fixtures
 python3 tools/invariants/verify.py --binary … --soak-minutes 480
 ```
