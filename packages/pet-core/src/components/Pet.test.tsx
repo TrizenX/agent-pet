@@ -160,28 +160,36 @@ describe("SpeechBubble", () => {
     expect(screen.getByText(/may i/i)).toBeTruthy();
   });
 
-  it("names the work in flight rather than the state", () => {
-    // The state alone cannot tell these apart — both are `working.digging`
-    // until you know which tool is running.
-    const { unmount } = render(<SpeechBubble state="working.digging" activity="bash" />);
-    expect(screen.getByText(/crunching/i)).toBeTruthy();
+  it("names what the work is on, not just what kind it is", () => {
+    // The whole point, and the thing the first version got wrong: "Running…"
+    // tells you nothing you could not already see. "Running pnpm test" does.
+    const { unmount } = render(
+      <SpeechBubble state="working.digging" activity="bash" activityLabel="pnpm test" />,
+    );
+    expect(screen.getByText("Running pnpm test")).toBeTruthy();
     unmount();
 
-    render(<SpeechBubble state="working.digging" activity="search" />);
-    expect(screen.getByText(/sniffing/i)).toBeTruthy();
+    render(<SpeechBubble state="working.typing" activity="file_edit" activityLabel="mapping.ts" />);
+    expect(screen.getByText("Editing mapping.ts")).toBeTruthy();
   });
 
-  it("falls back to a general word between two tool calls", () => {
+  it("falls back to the bare verb when the adapter sent no label", () => {
+    render(<SpeechBubble state="working.digging" activity="bash" />);
+    expect(screen.getByText("Running…")).toBeTruthy();
+  });
+
+  it("says it is thinking in the gap between two tool calls", () => {
     // The machine clears the activity when a tool finishes, so this is the real
-    // gap between calls — not a hypothetical.
+    // gap between calls — and in that gap the model is deciding what to do
+    // next. It used to say "On it!", which answers nothing.
     render(<SpeechBubble state="working.generic" activity={null} />);
-    expect(screen.getByText(/on it/i)).toBeTruthy();
+    expect(screen.getByText(/thinking/i)).toBeTruthy();
   });
 
   it("puts the user's request ahead of whatever tool caused it", () => {
     render(<SpeechBubble state="waiting_approval" activity="bash" />);
     expect(screen.getByText(/may i/i)).toBeTruthy();
-    expect(document.querySelector(".pet-bubble")?.textContent).not.toMatch(/crunching/i);
+    expect(document.querySelector(".pet-bubble")?.textContent).not.toMatch(/running/i);
   });
 
   it("lets a pack override win, even mid-tool", () => {
@@ -205,8 +213,10 @@ describe("SpeechBubble", () => {
     expect(screen.getByText(/Hết pin/)).toBeTruthy();
     unmount();
 
-    render(<SpeechBubble state="working.digging" locale="vi" activity="search" />);
-    expect(screen.getByText(/Đánh hơi/)).toBeTruthy();
+    render(
+      <SpeechBubble state="working.digging" locale="vi" activity="search" activityLabel="TODO" />,
+    );
+    expect(screen.getByText("Tìm TODO")).toBeTruthy();
   });
 });
 

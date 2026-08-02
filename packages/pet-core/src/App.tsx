@@ -103,14 +103,15 @@ export function App() {
   // is doing, and "the pet looks wrong" is not a debuggable report.
   // Declared before the early return below: hooks cannot sit behind a branch.
   const activity = snapshot.focused?.activity ?? null;
+  const activityLabel = snapshot.focused?.activityLabel ?? null;
   const locale = resolveLocale(shell.locale);
   useEffect(() => {
     // The spoken line too, not just the state. What the pet *says* is the part
     // a user reports, and two states can say the same word while one activity
     // makes two identical states say different ones.
-    const said = speechFor(state, locale, undefined, activity) ?? "—";
+    const said = speechFor(state, locale, undefined, activity, activityLabel) ?? "—";
     console.log(`[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""} says "${said}"`);
-  }, [state, snapshot.label, locale, activity]);
+  }, [state, snapshot.label, locale, activity, activityLabel]);
 
   // The tray can persist a pack the frontend cannot find, and the fallback to
   // the built-in pet looks identical to never having chosen one. Saying so
@@ -137,7 +138,7 @@ export function App() {
   const active = installed.find((p) => p.id === shell.pack) ?? pack;
 
   return (
-    <div className="pet-root" data-tauri-drag-region>
+    <div className="pet-root">
       <SpeechBubble state={state} project={snapshot.label} locale={locale} activity={activity} />
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />

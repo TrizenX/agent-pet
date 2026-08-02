@@ -229,14 +229,20 @@ pub fn clamp_to_visible(win: &WebviewWindow, wanted: (i32, i32)) -> (i32, i32) {
     let (w, h) = (size.width as i32, size.height as i32);
 
     let monitors = win.available_monitors().unwrap_or_default();
+    // Wholly on one screen, not merely mostly.
+    //
+    // "More than half overlaps" let a stored position survive a change to the
+    // window's own width — and when the window grew, the sprite (which sits
+    // centred in it) slid right by half the difference and hung off the edge
+    // while the check still called it visible. For a small always-on-top
+    // overlay there is no case where half-off is what anyone wanted.
     let visible = monitors.iter().any(|m| {
         let pos = m.position();
         let ms = m.size();
-        // A window counts as reachable if a decent slab of it is on screen; a
-        // few pixels peeking over an edge is not something a user can grab.
-        let overlap_x = (wanted.0 + w).min(pos.x + ms.width as i32) - wanted.0.max(pos.x);
-        let overlap_y = (wanted.1 + h).min(pos.y + ms.height as i32) - wanted.1.max(pos.y);
-        overlap_x > w / 2 && overlap_y > h / 2
+        wanted.0 >= pos.x
+            && wanted.1 >= pos.y
+            && wanted.0 + w <= pos.x + ms.width as i32
+            && wanted.1 + h <= pos.y + ms.height as i32
     });
 
     if visible {

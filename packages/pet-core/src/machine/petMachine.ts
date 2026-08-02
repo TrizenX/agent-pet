@@ -54,6 +54,15 @@ export interface PetContext {
    * cannot see it — the rule would still be enforced and still be broken.
    */
   activity: ToolKind | null;
+  /**
+   * What the work is *on* — a filename, a command's description, a search term.
+   *
+   * Supplied by the adapter, never composed here. This is data crossing the
+   * wire, not knowledge living in the source, which is the distinction I5 draws
+   * and the one an earlier version of this file got wrong: it refused the field
+   * on I5 grounds and left the pet saying "Working…" while you watched it work.
+   */
+  activityLabel: string | null;
 }
 
 export const DELAYS = {
@@ -94,6 +103,7 @@ const initialContext: PetContext = {
   hopCount: 0,
   blockedReason: null,
   activity: null,
+  activityLabel: null,
 };
 
 export function celebrationWorthy(ctx: PetContext, at: number): boolean {
@@ -154,13 +164,14 @@ export const petMachine = setup({
     clearBlock: assign({ blockedReason: null }),
     recordActivity: assign({
       activity: ({ event }) => (event.type === "TOOL_START" ? event.tool : null),
+      activityLabel: ({ event }) => (event.type === "TOOL_START" ? (event.label ?? null) : null),
     }),
     /**
      * Cleared when the work ends rather than when the next starts. A pet that
      * keeps saying "Running…" after the command finished is worse than one that
      * says nothing: the first is wrong, the second is merely quiet.
      */
-    clearActivity: assign({ activity: null }),
+    clearActivity: assign({ activity: null, activityLabel: null }),
   },
   delays: DELAYS,
 }).createMachine({

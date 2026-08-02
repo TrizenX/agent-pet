@@ -209,6 +209,7 @@ describe("celebrationWorthy (D5)", () => {
       hopCount: 0,
       blockedReason: null,
       activity: null,
+      activityLabel: null,
     };
     expect(celebrationWorthy(base, 15_000)).toBe(true);
     expect(celebrationWorthy(base, 14_999)).toBe(false);

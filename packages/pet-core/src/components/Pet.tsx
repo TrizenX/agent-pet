@@ -97,6 +97,11 @@ export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps)
     <div
       key={`${state}-${entry.current}`}
       className="pet-sprite"
+      /* The drag handle is the pet itself, sized to it exactly. The window is
+         far wider than the sprite so the speech bubble has room for a sentence,
+         and putting the drag region on the root would make that whole invisible
+         rectangle eat clicks meant for whatever is behind it. */
+      data-tauri-drag-region
       data-state={state}
       data-substituted={resolved.substituted || undefined}
       style={{

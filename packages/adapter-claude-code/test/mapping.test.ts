@@ -216,3 +216,56 @@ describe("hooks M5 added, and what they are for", () => {
     expect(map({ hook_event_name: "ElicitationResult" })[0]).toMatchObject({ type: "AGENT_IDLE" });
   });
 });
+
+describe("what the pet says the agent is doing", () => {
+  const label = (toolName: string, toolInput: unknown) => {
+    const [e] = claudeCodeAdapter.toPetEvents(
+      { ...BASE, hook_event_name: "PreToolUse", tool_name: toolName, tool_input: toolInput },
+      { receivedAt: 1 },
+    );
+    return (e as { label?: string } | undefined)?.label;
+  };
+
+  it("names the command, not the agent's prose about it", () => {
+    // "Running list the docs directory" was the first attempt. The verb already
+    // says it is running something; what a reader needs is *what*.
+    expect(label("Bash", { command: "ls docs/", description: "List the docs directory" })).toBe(
+      "ls docs/",
+    );
+  });
+
+  it.each([
+    ["cd ~/p && pnpm verify", "pnpm verify"],
+    ["export A=1; cargo test --all", "cargo test"],
+    ["grep -rn TODO src/", "grep TODO src/"],
+    ["git status", "git status"],
+  ])("strips the plumbing off %s", (command, want) => {
+    // The last segment does the work, and flags are dropped from it. Reducing
+    // to the program name turned `grep -rn TODO src/` into "grep", which
+    // answers nothing — the pattern is the entire point of a grep — but the
+    // flags spend a narrow bubble's width saying nothing either.
+    expect(label("Bash", { command })).toBe(want);
+  });
+
+  it("names the file, not the path", () => {
+    expect(label("Read", { file_path: "/a/b/PET_PACKS.md" })).toBe("PET_PACKS.md");
+    expect(label("Edit", { file_path: "/x/y/mapping.ts" })).toBe("mapping.ts");
+  });
+
+  it("names the pattern, the host, and the agent type", () => {
+    expect(label("Grep", { pattern: "TODO" })).toBe("TODO");
+    expect(label("WebFetch", { url: "https://petdex.dev/api/manifest" })).toBe("petdex.dev");
+    expect(label("Task", { subagent_type: "Explore" })).toBe("Explore");
+  });
+
+  it("truncates rather than letting the bubble grow without bound", () => {
+    const long = label("Grep", { pattern: "x".repeat(200) }) ?? "";
+    expect(long.length).toBeLessThanOrEqual(52);
+    expect(long.endsWith("…")).toBe(true);
+  });
+
+  it("omits the label rather than inventing one", () => {
+    expect(label("Bash", {})).toBeUndefined();
+    expect(label("Read", {})).toBeUndefined();
+  });
+});
