@@ -16,6 +16,9 @@ export type PetState =
   | "working.typing"
   | "working.reading"
   | "working.generic"
+  | "working.delegating"
+  | "compacting"
+  | "waiting_input"
   | "waiting_approval"
   | "error"
   | "exhausted"
@@ -61,7 +64,14 @@ export const STATE_ANIMATIONS: Readonly<Record<PetState, StateAnimation>> = Obje
   "working.typing": { row: "running", fpsScale: 1, mode: "loop" },
   "working.reading": { row: "review", fpsScale: 1, mode: "loop" },
   "working.generic": { row: "running", fpsScale: 0.8, mode: "loop" },
+  // Slower than the pet's own work: it is supervising, not doing.
+  "working.delegating": { row: "running", fpsScale: 0.6, mode: "loop" },
+  // Housekeeping. Head down in something, like reading, and unhurried.
+  compacting: { row: "review", fpsScale: 0.6, mode: "loop" },
   waiting_approval: { row: "waving", fpsScale: 1, mode: "loop" },
+  // Same gesture as an approval — the pet turning to face you. The glyph says
+  // which kind of answer it wants.
+  waiting_input: { row: "waving", fpsScale: 0.8, mode: "loop" },
   error: { row: "failed", fpsScale: 1, mode: "once-hold" },
   // Shares row 5 with `error`; the glyph and the dwell time separate them.
   exhausted: { row: "failed", fpsScale: 0.4, mode: "once-hold" },
@@ -77,7 +87,14 @@ export const REQUIRED_ROWS: readonly AtlasRow[] = Object.freeze([
   ...new Set(Object.values(STATE_ANIMATIONS).map((a) => a.row)),
 ]);
 
-export type GlyphId = "approval" | "blocked" | "error" | "trophy";
+export type GlyphId =
+  | "approval"
+  | "question"
+  | "delegate"
+  | "compact"
+  | "blocked"
+  | "error"
+  | "trophy";
 
 export interface GlyphSpec {
   readonly id: GlyphId;
@@ -91,6 +108,16 @@ export interface GlyphSpec {
  */
 export const STATE_GLYPHS: Readonly<Partial<Record<PetState, GlyphSpec>>> = Object.freeze({
   waiting_approval: { id: "approval", emoji: "❓", glow: "amber-pulse" },
+  // Shares row 3 with `waiting_approval`, because both are the pet turning to
+  // face the user. The glyph is the whole difference: one wants a yes, the
+  // other wants an answer.
+  waiting_input: { id: "question", emoji: "💬", glow: "amber-pulse" },
+  // Shares row 7 with the other working states. Nothing in the atlas depicts
+  // handing work to someone else.
+  "working.delegating": { id: "delegate", emoji: "👥", glow: "none" },
+  // Shares row 8 with reading, which is close enough — both are the pet with
+  // its head down in something.
+  compacting: { id: "compact", emoji: "🧹", glow: "none" },
   exhausted: { id: "blocked", emoji: "🔋", glow: "red-dim" },
   error: { id: "error", emoji: "⚠️", glow: "red-flash" },
   celebrating: { id: "trophy", emoji: "🏆", glow: "none" },

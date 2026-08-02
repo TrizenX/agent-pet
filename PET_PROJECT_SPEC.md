@@ -813,6 +813,13 @@ spot, with atlas row 2 (`running-left`) unused entirely.
       burst of work rather than one per frame.
 - [x] **Make the Vietnamese strings reachable.** They had existed since M1 and
       `locale` was hardcoded to `"en"`, so nothing could ever display them.
+- [x] **Catch the hooks we were dropping, and give them states.** `PreCompact`
+      and `SubagentStop` were never registered at all; `SUBAGENT_START`/`_END`
+      had sat in the wire format since M0 marked "accepted and ignored"; and
+      `agent_needs_input` was folded into `AGENT_IDLE`, which made *the agent
+      asked you a question* look exactly like *the agent has nothing to do*.
+      Eleven states became fourteen: `working.delegating`, `compacting`,
+      `waiting_input`.
 
 **The constraint that shaped it:** I6. Movement means a timer, and a timer is
 what M1's review removed. So the ticker exists only while the pet is walking —

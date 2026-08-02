@@ -11,8 +11,10 @@ import {
 const ALL_STATES = Object.keys(STATE_ANIMATIONS) as PetState[];
 
 describe("state -> row mapping", () => {
-  it("covers all eleven states", () => {
-    expect(ALL_STATES).toHaveLength(11);
+  it("covers every state, and every state has somewhere to draw", () => {
+    // A count rather than a list, so adding a state is a deliberate edit here
+    // and not something that slips in unnoticed.
+    expect(ALL_STATES).toHaveLength(14);
   });
 
   it("resolves every state to a row that exists in the atlas", () => {

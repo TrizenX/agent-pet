@@ -67,6 +67,21 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
       // only one should make the pet fall over.
       return [{ type: "TOOL_DONE", ok: false, tool, interrupted: raw.is_interrupt === true }];
 
+    /**
+     * Compaction. Registered because it is one of the longest visible pauses a
+     * session has, and until now the pet spent it looking like it had hung.
+     */
+    case "PreCompact":
+      return [{ type: "COMPACTING" }];
+
+    /**
+     * A delegated agent finished. There is no matching start hook — the pet
+     * learns a subagent began from `PreToolUse` on a delegating tool — so this
+     * is what closes the bracket.
+     */
+    case "SubagentStop":
+      return [{ type: "SUBAGENT_END" }];
+
     case "PermissionRequest":
       return [{ type: "APPROVAL_NEEDED", tool }];
     case "PermissionDenied":
@@ -77,8 +92,11 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
         case "permission_prompt":
           return [{ type: "APPROVAL_NEEDED" }];
         case "idle_prompt":
-        case "agent_needs_input":
           return [{ type: "AGENT_IDLE" }];
+        // Was folded into AGENT_IDLE, which made "the agent asked you
+        // something" look exactly like "the agent has nothing to do".
+        case "agent_needs_input":
+          return [{ type: "INPUT_NEEDED" }];
         case "agent_completed":
           return [{ type: "TURN_END" }];
         default:
@@ -127,6 +145,8 @@ export const claudeCodeAdapter: PetAdapter = {
           Notification: plain,
           Stop: plain,
           StopFailure: plain,
+          PreCompact: plain,
+          SubagentStop: plain,
         },
       },
       null,

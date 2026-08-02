@@ -112,6 +112,7 @@ export const petMachine = setup({
   guards: {
     isBash: ({ event }) => event.type === "TOOL_START" && event.tool === "bash",
     isFileEdit: ({ event }) => event.type === "TOOL_START" && event.tool === "file_edit",
+    isDelegate: ({ event }) => event.type === "TOOL_START" && event.tool === "delegate",
     isReading: ({ event }) =>
       event.type === "TOOL_START" && (event.tool === "file_read" || event.tool === "search"),
 
@@ -188,6 +189,15 @@ export const petMachine = setup({
     // can be wrong instead of two.
     APPROVAL_NEEDED: { target: ".waiting_approval", actions: ["touch", "clearActivity"] },
     AGENT_BLOCKED: { target: ".exhausted", actions: ["touch", "recordBlock", "clearActivity"] },
+    INPUT_NEEDED: { target: ".waiting_input", actions: ["touch", "clearActivity"] },
+    COMPACTING: { target: ".compacting", actions: ["touch", "clearActivity"] },
+    /**
+     * The delegated agent came back. There is no start hook to pair with, so
+     * this can arrive in any state — landing in `working.generic` is right for
+     * the case it was sent for and harmless everywhere else, because whatever
+     * the agent does next sends its own event.
+     */
+    SUBAGENT_END: { target: ".working.generic", actions: ["touch", "clearActivity"] },
 
     TOOL_START: [
       {
@@ -198,6 +208,11 @@ export const petMachine = setup({
       {
         guard: "isFileEdit",
         target: ".working.typing",
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
+      },
+      {
+        guard: "isDelegate",
+        target: ".working.delegating",
         actions: ["touch", "countTool", "clearBlock", "recordActivity"],
       },
       {
@@ -267,8 +282,29 @@ export const petMachine = setup({
         digging: {},
         typing: {},
         reading: {},
+        delegating: {},
         generic: {},
       },
+    },
+
+    /**
+     * The agent asked a question. An attention state, so the watchdog leaves it
+     * alone for the same reason it leaves an approval alone — silence here
+     * means the user stepped away, which is when the question most needs to
+     * still be on screen.
+     */
+    waiting_input: {
+      on: { WATCHDOG: {} },
+      after: { APPROVAL_DECAY: "idle" },
+    },
+
+    /**
+     * Compaction. Bounded by the same generous decay as the other busy states:
+     * it can legitimately take a while, and the decay is there to catch a hook
+     * that never arrived rather than to interrupt real work.
+     */
+    compacting: {
+      after: { ACTIVITY_DECAY: "idle" },
     },
 
     waiting_approval: {

@@ -38,6 +38,9 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
     "working.typing": "On it!",
     "working.digging": "On it!",
     "working.reading": "On it!",
+    "working.delegating": "Sent a friend…",
+    compacting: "Tidying up…",
+    waiting_input: "Well?",
     waiting_approval: "May I?",
     exhausted: "Out of puff…",
     error: "Oops!",
@@ -49,6 +52,9 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
     "working.typing": "Làm đây!",
     "working.digging": "Làm đây!",
     "working.reading": "Làm đây!",
+    "working.delegating": "Nhờ bạn rồi…",
+    compacting: "Dọn dẹp tí…",
+    waiting_input: "Sao nào?",
     waiting_approval: "Cho phép nhé?",
     exhausted: "Hết pin rồi…",
     error: "Ui!",
@@ -102,6 +108,8 @@ const ACTIVITY_STATES: ReadonlySet<PetState> = new Set<PetState>([
   "working.typing",
   "working.digging",
   "working.reading",
+  // Not `working.delegating` or `compacting`: both already say something more
+  // specific than the tool would.
 ]);
 
 export function speechFor(

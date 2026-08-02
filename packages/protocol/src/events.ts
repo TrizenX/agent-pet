@@ -3,6 +3,11 @@
  *
  * Invariant I7: every event carries `v` and `source`. Phase 3 turns this file
  * into a public protocol; unversioned protocols die.
+ *
+ * New *types* are additive and do not bump `v`. A receiver that predates one
+ * drops it (§6.2), which is the forward compatibility the version exists to
+ * protect — bumping instead would strand every adapter to describe an event
+ * they do not send. `v` moves when the shape of an existing event changes.
  */
 
 export const PET_EVENT_VERSION = 1;
@@ -57,7 +62,22 @@ export type PetEventBody =
    */
   | { type: "TURN_END" }
   | { type: "AGENT_BLOCKED"; reason: BlockReason }
-  // Reserved for Phase 1.5. Accepted and ignored in Phase 1.
+  /**
+   * The agent asked the user a question and is waiting for the answer.
+   *
+   * Distinct from `AGENT_IDLE`, which it used to be folded into. Both mean the
+   * agent stopped, and only one of them means it stopped *on you* — collapsing
+   * them made a question indistinguishable from an empty prompt, which is the
+   * failure the pet exists to prevent.
+   */
+  | { type: "INPUT_NEEDED" }
+  /**
+   * The agent is compacting its context.
+   *
+   * Long, visible, and nothing to do with the user, so a pet that looks busy
+   * and says why beats one that looks stuck.
+   */
+  | { type: "COMPACTING" }
   | { type: "SUBAGENT_START"; agentType?: string }
   | { type: "SUBAGENT_END" };
 
@@ -76,6 +96,8 @@ const KNOWN_TYPES: ReadonlySet<string> = new Set<PetEventType>([
   "AGENT_IDLE",
   "TURN_END",
   "AGENT_BLOCKED",
+  "INPUT_NEEDED",
+  "COMPACTING",
   "SUBAGENT_START",
   "SUBAGENT_END",
 ]);

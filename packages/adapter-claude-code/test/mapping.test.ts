@@ -112,7 +112,7 @@ describe("mapping — Notification switches on notification_type", () => {
   it.each([
     ["permission_prompt", "APPROVAL_NEEDED"],
     ["idle_prompt", "AGENT_IDLE"],
-    ["agent_needs_input", "AGENT_IDLE"],
+    ["agent_needs_input", "INPUT_NEEDED"],
     ["agent_completed", "TURN_END"],
   ] as const)("%s -> %s", (kind, type) => {
     expect(one({ ...BASE, hook_event_name: "Notification", notification_type: kind }).type).toBe(
