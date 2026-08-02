@@ -27,3 +27,6 @@ __pycache__/
 # Editor state. Machine-specific, and this one appeared on its own.
 .idea/
 .vscode/
+
+# Scratch for the layout harnesses: screenshots and the probe document.
+/artifacts/layout/
