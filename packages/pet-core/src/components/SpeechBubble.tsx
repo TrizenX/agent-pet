@@ -40,6 +40,8 @@ export interface SpeechLine {
  * it back. Same channel and same cost as the `[pet] … says` line beside it:
  * one line when something changes, nothing while the pet is asleep (I6).
  */
+let lastReported = "";
+
 function useReportGeometry(node: HTMLDivElement | null, key: string): void {
   // `key` changes whenever the rendered text does, which is exactly when the
   // geometry can change. The linter cannot see that it is read inside the
@@ -61,12 +63,17 @@ function useReportGeometry(node: HTMLDivElement | null, key: string): void {
     // The gap between the bubble's underside and the top of the sprite.
     const gap = Math.round(view.clientHeight - petH - box.bottom);
 
-    console.log(
+    const line =
       `[layout] bubble ${Math.round(box.width)}x${Math.round(box.height)} ` +
-        `at ${Math.round(box.left)},${Math.round(box.top)} ` +
-        `window ${view.clientWidth}x${view.clientHeight} gap ${gap} ` +
-        `truncated ${truncated} outside ${outside}`,
-    );
+      `at ${Math.round(box.left)},${Math.round(box.top)} ` +
+      `window ${view.clientWidth}x${view.clientHeight} gap ${gap} ` +
+      `truncated ${truncated} outside ${outside}`;
+    // Only when the measurement itself moves. The text changes on every event
+    // and the geometry almost never does, so reporting per render meant an IPC
+    // call several times a second for a number that had not budged.
+    if (line === lastReported) return;
+    lastReported = line;
+    console.log(line);
   }, [node, key]);
 }
 

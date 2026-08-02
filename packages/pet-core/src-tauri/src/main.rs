@@ -58,7 +58,23 @@ fn main() {
                     }
                     None => false,
                 };
-                window::show(&win, click_through);
+                // On the main thread, because AppKit insists.
+                //
+                // This callback runs on the thread the plugin listens for the
+                // second launch on, and `show()` orders an NSWindow. Doing that
+                // off the main thread trips an assertion inside AppKit's window
+                // coordinator and takes the process down — so launching the app
+                // a second time killed the pet that was already running, which
+                // is the exact opposite of what this callback is for.
+                //
+                // Found from a crash report, after a soak died twenty seconds
+                // in and the crash turned out to predate it.
+                let handle = app.clone();
+                let _ = win.run_on_main_thread(move || {
+                    if let Some(win) = handle.get_webview_window("pet") {
+                        window::show(&win, click_through);
+                    }
+                });
             }
         }))
         .manage(state.clone())
@@ -175,8 +191,16 @@ fn report_ready(
 /// A transparent, undecorated overlay has nowhere to show a failure — a broken
 /// frontend and a working one both look like an empty screen. Without this the
 /// only symptom of a crashed renderer is a pet that never appears.
+///
+/// `async`, and that is not cosmetic. A non-async command runs *inline on the
+/// thread owning the webview's IPC handler*, which on macOS is the UI thread —
+/// M4's review established this for the gallery commands and this one was
+/// missed. Every console line the frontend writes came through here, so under
+/// load the app logged itself to death: thirty events was enough to wedge it
+/// so thoroughly that the HTTP server stopped answering, and a soak died
+/// twenty seconds in looking like a memory problem.
 #[tauri::command]
-fn webview_log(level: String, message: String) {
+async fn webview_log(level: String, message: String) {
     println!("[webview:{level}] {message}");
 }
 
