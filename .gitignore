@@ -23,3 +23,7 @@ target/
 /packages/pet-core/src-tauri/gen/schemas/
 __pycache__/
 *.pyc
+
+# Editor state. Machine-specific, and this one appeared on its own.
+.idea/
+.vscode/

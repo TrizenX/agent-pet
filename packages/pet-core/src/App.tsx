@@ -8,6 +8,7 @@ import { SessionBadge } from "./components/SessionBadge.tsx";
 import { SpeechBubble } from "./components/SpeechBubble.tsx";
 import { StateGlyph } from "./components/StateGlyph.tsx";
 import { listenForScenarios } from "./demo/runner.ts";
+import { stopListening } from "./events.ts";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
 import { selectPack, useShellSettings } from "./hooks/useShellSettings.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
@@ -49,21 +50,21 @@ export function App() {
   useEffect(() => {
     const unlisten = listen("copy-hooks", () => void copyHookConfig());
     return () => {
-      void unlisten.then((off) => off()).catch(() => {});
+      stopListening(unlisten, "copy-hooks");
     };
   }, []);
 
   useEffect(() => {
     const unlisten = listen("toggle-event-log", () => setLogOpen((v) => !v));
     return () => {
-      void unlisten.then((off) => off()).catch(() => {});
+      stopListening(unlisten, "toggle-event-log");
     };
   }, []);
 
   useEffect(() => {
     const unlisten = listen("open-gallery", () => setPickerOpen(true));
     return () => {
-      void unlisten.then((off) => off()).catch(() => {});
+      stopListening(unlisten, "open-gallery");
     };
   }, []);
 
@@ -140,7 +141,18 @@ export function App() {
         onInstalled={(slug) => {
           // Load it, then wear it. Installing a pet you then have to go and
           // select is two steps where the user asked for one.
-          void rescanPacks(() => true).then(() => selectPack(slug));
+          //
+          // Guarded even though `rescanPacks` cannot currently reject: the
+          // failure it would produce — the picker says "installed" and the pet
+          // never changes — is the exact silent-success shape this project has
+          // now shipped twice.
+          void rescanPacks(() => true)
+            .then(() => selectPack(slug))
+            .catch((e) => {
+              console.warn(
+                `[packs] installed ${slug} but could not apply it: ${e instanceof Error ? e.message : e}`,
+              );
+            });
         }}
       />
     </div>

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useReducer, useRef } from "react";
 import { ADAPTERS } from "../adapters/registry.ts";
+import { stopListening } from "../events.ts";
 import { type AgentRaw, ingestInto } from "../pipeline.ts";
 import { type RegistrySnapshot, SessionRegistry } from "../sessions/registry.ts";
 
@@ -103,7 +104,7 @@ export function useAgentEvents(): AgentEventsState {
 
     return () => {
       clearInterval(timer);
-      void unlisten.then((off) => off()).catch(() => {});
+      stopListening(unlisten, "agent-raw");
       reg.clear();
     };
   }, []);

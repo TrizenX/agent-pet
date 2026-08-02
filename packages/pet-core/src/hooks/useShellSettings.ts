@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import { stopListening } from "../events.ts";
 
 /**
  * Settings the tray owns.
@@ -70,7 +71,7 @@ export function useShellSettings(): ShellSettings {
     );
     return () => {
       live = false;
-      void unlisten.then((off) => off()).catch(() => {});
+      stopListening(unlisten, "pet-settings");
     };
   }, []);
 

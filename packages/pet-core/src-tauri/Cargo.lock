@@ -13,6 +13,7 @@ name = "agent-pet"
 version = "0.0.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "block",
  "http-body-util",
  "objc",
