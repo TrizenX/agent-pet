@@ -18,7 +18,8 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm lint:no-agent-strings && node scripts/generate-hooks-json.mjs --check && pnpm test",
     "dev": "pnpm --filter @agent-pet/pet-core dev",
     "tauri": "pnpm --filter @agent-pet/pet-core tauri",
-    "hooks:generate": "node scripts/generate-hooks-json.mjs"
+    "hooks:generate": "node scripts/generate-hooks-json.mjs",
+    "verify:rust": "cargo fmt --manifest-path packages/pet-core/src-tauri/Cargo.toml -- --check && cargo test --manifest-path packages/pet-core/src-tauri/Cargo.toml"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

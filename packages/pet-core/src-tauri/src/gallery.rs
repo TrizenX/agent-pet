@@ -133,7 +133,8 @@ pub fn install_pack(
     std::fs::create_dir_all(&staging).map_err(|e| format!("could not create {slug}: {e}"))?;
 
     let write = |name: &str, bytes: &[u8]| -> Result<(), String> {
-        std::fs::write(staging.join(name), bytes).map_err(|e| format!("could not write {name}: {e}"))
+        std::fs::write(staging.join(name), bytes)
+            .map_err(|e| format!("could not write {name}: {e}"))
     };
     if let Err(e) = write("pet.json", pet_json.as_bytes()).and_then(|()| write(&sheet_name, &sheet))
     {
@@ -173,7 +174,8 @@ pub fn select_pack(app: tauri::AppHandle, slug: String) -> Result<(), String> {
     let mut settings = shared.settings.lock().expect("settings poisoned");
     settings.pack = slug;
     crate::settings::save(&app, &settings);
-    app.emit("pet-settings", &*settings).map_err(|e| e.to_string())
+    app.emit("pet-settings", &*settings)
+        .map_err(|e| e.to_string())
 }
 
 /// Remove a pack we installed. Only ever from our own directory.
@@ -219,7 +221,13 @@ mod tests {
 
     #[test]
     fn accepts_the_slugs_the_gallery_actually_uses() {
-        for slug in ["guga", "wukong-5", "blue-guga", "pet_package_zhizhi3-0", "a"] {
+        for slug in [
+            "guga",
+            "wukong-5",
+            "blue-guga",
+            "pet_package_zhizhi3-0",
+            "a",
+        ] {
             assert!(is_safe_slug(slug), "{slug} should be installable");
         }
     }

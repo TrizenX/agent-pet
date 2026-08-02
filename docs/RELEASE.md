@@ -31,7 +31,7 @@ The bundled pet is placeholder art. It is ours and it ships fine (see [`IP_POLIC
 
 ```sh
 pnpm verify                                    # typecheck, lint, I5, hooks drift, tests
-cargo test  --manifest-path packages/pet-core/src-tauri/Cargo.toml
+pnpm verify:rust                               # rustfmt --check, then cargo test
 node packages/adapter-claude-code/src/cli.ts record --install   # re-record fixtures
 python3 tools/invariants/verify.py --binary … --soak-minutes 480
 ```

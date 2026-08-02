@@ -125,7 +125,13 @@ pub fn build(
     }
     // Last in the submenu, and the only item there that touches the network.
     // §12.4: nothing is fetched until someone opens this.
-    let more = MenuItem::with_id(app, "get-more-pets", "Get more pets\u{2026}", true, None::<&str>)?;
+    let more = MenuItem::with_id(
+        app,
+        "get-more-pets",
+        "Get more pets\u{2026}",
+        true,
+        None::<&str>,
+    )?;
 
     let choose_pet = Submenu::with_id_and_items(
         app,
