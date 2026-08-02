@@ -39,7 +39,8 @@ pub fn apply_overlay_behaviour(window: &WebviewWindow) {
 /// is an unsupported platform that pretends.
 #[cfg(target_os = "linux")]
 fn warn_if_wayland() {
-    let wayland = std::env::var("XDG_SESSION_TYPE").is_ok_and(|v| v.eq_ignore_ascii_case("wayland"))
+    let wayland = std::env::var("XDG_SESSION_TYPE")
+        .is_ok_and(|v| v.eq_ignore_ascii_case("wayland"))
         || std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty());
     if !wayland {
         return;
@@ -404,7 +405,10 @@ pub fn place(win: &WebviewWindow, at: (i32, i32)) {
             "[window] asked for {},{} but the compositor placed it at {},{}",
             at.0, at.1, p.x, p.y
         ),
-        Err(e) => eprintln!("[window] moved to {},{} but cannot read it back: {e}", at.0, at.1),
+        Err(e) => eprintln!(
+            "[window] moved to {},{} but cannot read it back: {e}",
+            at.0, at.1
+        ),
     }
 }
 
