@@ -1,6 +1,7 @@
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod gallery;
 mod guard;
 mod packs;
 mod queue;
@@ -66,7 +67,12 @@ fn main() {
             endpoint_url,
             get_settings,
             copy_text,
-            list_packs
+            list_packs,
+            gallery::gallery_cache_read,
+            gallery::gallery_cache_write,
+            gallery::install_pack,
+            gallery::select_pack,
+            gallery::uninstall_pack
         ])
         // `eval` during setup runs against whatever document exists at that
         // moment and is discarded on navigation, so the bridge has to be
@@ -103,7 +109,7 @@ fn main() {
             }
             let shared = std::sync::Arc::new(tray::AppState {
                 settings: std::sync::Mutex::new(saved.clone()),
-                packs: found,
+                packs: std::sync::Mutex::new(found),
             });
             app.manage(shared.clone());
 
@@ -114,7 +120,11 @@ fn main() {
                     .map(|p| window::clamp_to_visible(&win, p))
                     .unwrap_or_else(|| window::default_corner(&win)),
             );
-            tray::build(app.handle(), &saved, &shared.packs)?;
+            tray::build(
+                app.handle(),
+                &saved,
+                &shared.packs.lock().expect("packs poisoned"),
+            )?;
             remember_position(&win, app.handle().clone(), shared);
 
             println!(
@@ -198,7 +208,7 @@ fn list_packs(app: tauri::AppHandle) -> Vec<packs::DiscoveredPack> {
     // The list `setup` scanned, not a second scan: the tray persists a pack by
     // the id it saw, and the frontend has to look it up by that same id.
     match app.try_state::<Arc<tray::AppState>>() {
-        Some(shared) => shared.packs.clone(),
+        Some(shared) => shared.packs.lock().expect("packs poisoned").clone(),
         None => Vec::new(),
     }
 }

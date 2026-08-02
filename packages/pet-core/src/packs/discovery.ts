@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { classifyGeometry } from "./atlas.ts";
+import { decodeSheetAt } from "./decode.ts";
 import { buildPack, describeProblem, type LoadedPack, parsePetJson } from "./loader.ts";
 
 /**
@@ -27,38 +27,6 @@ export interface PackListing {
   readonly rejected: readonly { id: string; reason: string }[];
 }
 
-/**
- * Decode a sheet, refusing one whose geometry we would reject anyway.
- *
- * The order matters and used to be wrong. `getImageData` allocates
- * `width·height·4` bytes and `measureFrameCounts` then walks every one of them
- * synchronously, on the thread that draws the pet — so checking the geometry
- * *after* decoding means a hostile or merely silly sheet has already cost us
- * the memory and the freeze by the time we decide not to use it.
- * `createImageBitmap` gives us the dimensions first; that is where the decision
- * belongs.
- */
-async function decode(url: string): Promise<ImageData> {
-  const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-  const geometry = classifyGeometry(bitmap.width, bitmap.height);
-  if (!geometry) {
-    const { width, height } = bitmap;
-    bitmap.close();
-    throw new Error(describeProblem({ kind: "bad-geometry", width, height }));
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) {
-    bitmap.close();
-    throw new Error("no 2d context");
-  }
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
-}
-
 async function loadOne(found: DiscoveredPack): Promise<{ pack: LoadedPack } | { reason: string }> {
   if (!found.sheet) return { reason: "no spritesheet next to pet.json" };
 
@@ -75,7 +43,7 @@ async function loadOne(found: DiscoveredPack): Promise<{ pack: LoadedPack } | { 
 
   let sheet: ImageData;
   try {
-    sheet = await decode(convertFileSrc(found.sheet));
+    sheet = await decodeSheetAt(convertFileSrc(found.sheet));
   } catch (e) {
     return { reason: e instanceof Error ? e.message : `spritesheet undecodable (${e})` };
   }

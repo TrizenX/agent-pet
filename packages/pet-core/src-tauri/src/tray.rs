@@ -15,14 +15,19 @@ use crate::window;
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
-    /// What was on disk at startup.
+    /// What is on disk.
     ///
-    /// Scanned once, in `setup`, and shared with the frontend from here. The
-    /// tray and the webview have to agree on the id of every pack — the tray
-    /// writes the selection and the webview looks it up — and two independent
-    /// scans is one more way for them to disagree. It also halves the startup
-    /// disk I/O, which happens on the main thread before the window is shown.
-    pub packs: Vec<crate::packs::DiscoveredPack>,
+    /// Scanned once in `setup` and shared with the frontend from here. The tray
+    /// and the webview have to agree on the id of every pack — the tray writes
+    /// the selection and the webview looks it up — and two independent scans is
+    /// one more way for them to disagree. It also halves the startup disk I/O,
+    /// which happens on the main thread before the window is shown.
+    ///
+    /// Behind a lock because installing refreshes it. That is the only rescan:
+    /// one the user asked for by pressing a button, not a poll. Without it a
+    /// freshly installed pack stayed invisible until the next launch — the
+    /// startup cache is right for startup and wrong the moment we can write.
+    pub packs: Mutex<Vec<crate::packs::DiscoveredPack>>,
 }
 
 /// Scales offered in the Size submenu. Anything else is a data change.
@@ -118,6 +123,10 @@ pub fn build(
             Err(e) => println!("[packs] no menu item for {}: {e}", found.id),
         }
     }
+    // Last in the submenu, and the only item there that touches the network.
+    // §12.4: nothing is fetched until someone opens this.
+    let more = MenuItem::with_id(app, "get-more-pets", "Get more pets\u{2026}", true, None::<&str>)?;
+
     let choose_pet = Submenu::with_id_and_items(
         app,
         "choose-pet",
@@ -126,6 +135,10 @@ pub fn build(
         &pack_items
             .iter()
             .map(|i| i as &dyn tauri::menu::IsMenuItem<_>)
+            .chain([
+                &PredefinedMenuItem::separator(app)? as &dyn tauri::menu::IsMenuItem<_>,
+                &more as &dyn tauri::menu::IsMenuItem<_>,
+            ])
             .collect::<Vec<_>>(),
     )?;
 
@@ -233,6 +246,12 @@ fn on_menu(app: &AppHandle, id: &str) {
 
         "event-log" => {
             let _ = app.emit("toggle-event-log", ());
+        }
+
+        "get-more-pets" => {
+            // The shell knows nothing about the gallery — no URL, no schema, no
+            // HTTP client. It forwards the request and the frontend decides.
+            let _ = app.emit("open-gallery", ());
         }
 
         other if other.starts_with("pack:") => {

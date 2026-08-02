@@ -762,6 +762,33 @@ Two unknowns can invalidate the design. Prove them before building anything.
 - [ ] `docs/PET_PACKS.md` (our state mapping + glyph layer) and `docs/IP_POLICY.md`.
 - [ ] Signed/notarised `.dmg` and a Windows installer.
 
+### M4 — Real work, real numbers (added after M3)
+
+Everything so far has been measured against payloads we composed ourselves, in a
+debug build, over minutes. Three of the four M0 spikes changed the design and the
+fourth changed the atlas; none of that is evidence that the thing works while
+someone uses it. M4 is where the inputs stop being ours.
+
+- [ ] **Gallery client (§12.4).** The last unbuilt feature in the spec. Opt-in,
+      lazy, cached 24 h, silent when offline. Bytes go from the gallery's CDN to
+      the user's disk; we hold none of them (§17.2).
+- [ ] **A real session, end to end.** Install the hooks into a real Claude Code
+      and drive the pet with an actual working session. Record the payloads as
+      fixtures, `StopFailure` from a genuine rate limit included (TZX-63) — it
+      is the only input to `exhausted`, and that state has never been reached by
+      a real event.
+- [ ] **Release-build numbers, and a soak long enough to mean something.** Every
+      figure in `artifacts/` is a debug build over six to ten minutes, and the
+      last soak had not reached steady state. Eight hours, release build.
+
+**Gate:** M4 is the first milestone whose acceptance cannot be satisfied by
+anything we wrote. If a real session produces an event shape the fixtures do not
+have, that is the finding, not a bug to patch quietly.
+
+Still blocked on things no code fixes: signing needs an Apple identity, Windows
+and Linux need hosts, and one visual confirmation of the overlay needs Screen
+Recording permission. Tracked in [`docs/RELEASE.md`](docs/RELEASE.md), not here.
+
 ---
 
 ## 15. Out of scope

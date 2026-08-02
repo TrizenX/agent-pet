@@ -1,4 +1,5 @@
 import { COLUMNS, FRAME_HEIGHT, FRAME_WIDTH } from "./atlas.ts";
+import { decodeSheetAt } from "./decode.ts";
 import manifest from "./default/pet.json";
 import sheetUrl from "./default/spritesheet.png";
 import { buildPack, describeProblem, type LoadedPack } from "./loader.ts";
@@ -10,22 +11,10 @@ import { buildPack, describeProblem, type LoadedPack } from "./loader.ts";
  * default pet and refactoring it into packs later is how the two drift apart.
  */
 
-async function decode(url: string): Promise<ImageData> {
-  const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("no 2d context");
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
-}
-
 export async function loadDefaultPack(): Promise<LoadedPack> {
   let sheet: ImageData;
   try {
-    sheet = await decode(sheetUrl);
+    sheet = await decodeSheetAt(sheetUrl);
   } catch (e) {
     // The one pack with nothing beneath it. An installed pack that fails to
     // load falls back to this one; this one falling back to a rejected promise

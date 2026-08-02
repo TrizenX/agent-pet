@@ -172,3 +172,94 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The gallery picker. Same footprint as the event log — the window is small and
+   two full-bleed panels are simpler than deciding which one wins. */
+.pet-picker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgb(16 16 20 / 0.97);
+  color: #e6e6ea;
+  border-radius: 8px;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.pet-picker-head {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.pet-picker-head input {
+  flex: 1;
+  min-width: 0;
+  background: rgb(255 255 255 / 0.06);
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  padding: 3px 6px;
+}
+
+.pet-picker-head button,
+.pet-picker-list button {
+  background: rgb(255 255 255 / 0.1);
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.pet-picker-list button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pet-picker-note,
+.pet-picker-foot {
+  padding: 4px 6px;
+  color: rgb(230 230 234 / 0.55);
+}
+
+.pet-picker-foot {
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.pet-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pet-picker-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+}
+
+.pet-picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pet-picker-status {
+  color: rgb(230 230 234 / 0.6);
+}
+
+.pet-picker-status[data-bad] {
+  color: #ff9a8c;
+}
