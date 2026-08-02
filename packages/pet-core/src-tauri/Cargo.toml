@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # `macos-private-api` is what enables a transparent NSWindow. See the App Store
 # note in artifacts/spike-a/FINDINGS.md — this flag has distribution consequences.
-tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "protocol-asset"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 # Tauri already runs tokio; this pulls in the pieces we use, not a second runtime.
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "net", "time", "macros"] }

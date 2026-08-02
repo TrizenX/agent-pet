@@ -21,6 +21,8 @@ pub struct Settings {
     /// 0.75, 1.0 or 1.5. Stored rather than an enum so a future size is data.
     pub scale: f64,
     pub hidden: bool,
+    /// Pack id, or empty for the built-in pet.
+    pub pack: String,
 }
 
 impl Default for Settings {
@@ -31,6 +33,7 @@ impl Default for Settings {
             glyphs_enabled: true,
             scale: 1.0,
             hidden: false,
+            pack: String::new(),
         }
     }
 }

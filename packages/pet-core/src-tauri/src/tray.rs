@@ -77,6 +77,38 @@ pub fn build(app: &AppHandle, initial: &Settings) -> tauri::Result<()> {
             .collect::<Vec<_>>(),
     )?;
 
+    // Built from disk at startup. A pack installed later needs a restart —
+    // acceptable for Phase 1, and honest: the alternative is watching three
+    // directories for the whole session to save one relaunch.
+    let mut pack_items: Vec<CheckMenuItem<_>> = vec![CheckMenuItem::with_id(
+        app,
+        "pack:",
+        "Built-in",
+        true,
+        initial.pack.is_empty(),
+        None::<&str>,
+    )?];
+    for found in crate::packs::discover(app) {
+        pack_items.push(CheckMenuItem::with_id(
+            app,
+            format!("pack:{}", found.id),
+            format!("{}  ({})", found.id, found.root),
+            true,
+            initial.pack == found.id,
+            None::<&str>,
+        )?);
+    }
+    let choose_pet = Submenu::with_id_and_items(
+        app,
+        "choose-pet",
+        "Choose pet",
+        true,
+        &pack_items
+            .iter()
+            .map(|i| i as &dyn tauri::menu::IsMenuItem<_>)
+            .collect::<Vec<_>>(),
+    )?;
+
     let demo_items = [
         ("demo-full", "Full session"),
         ("demo-approval", "Approval"),
@@ -108,6 +140,7 @@ pub fn build(app: &AppHandle, initial: &Settings) -> tauri::Result<()> {
             &show,
             &click_through,
             &glyphs,
+            &choose_pet,
             &size,
             &demo,
             &PredefinedMenuItem::separator(app)?,
@@ -180,6 +213,11 @@ fn on_menu(app: &AppHandle, id: &str) {
 
         "event-log" => {
             let _ = app.emit("toggle-event-log", ());
+        }
+
+        other if other.starts_with("pack:") => {
+            settings.pack = other.trim_start_matches("pack:").to_string();
+            let _ = app.emit("pet-settings", &settings);
         }
 
         other if other.starts_with("size-") => {

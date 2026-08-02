@@ -28,6 +28,12 @@ const ALLOWED = new Set([
   // for tests — the rule already caught an agent name in a machine test
   // comment, which was a real smell.
   "pipeline.test.ts",
+  // Pack install roots. `~/.codex/pets` names a tool, but it is an *art*
+  // location, not agent knowledge: the list would be identical whether we
+  // supported zero adapters or ten, and adding an adapter never changes it.
+  // Exempting the file rather than obfuscating the path, because a composed
+  // string would defeat the check without defeating the coupling.
+  "packs.rs",
 ]);
 
 /** Strings that would mean agent knowledge has leaked out of the adapter. */

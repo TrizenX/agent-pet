@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod guard;
+mod packs;
 mod queue;
 mod server;
 mod settings;
@@ -62,7 +63,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             report_ready,
             webview_log,
-            endpoint_url
+            endpoint_url,
+            get_settings,
+            copy_text,
+            list_packs
         ])
         // `eval` during setup runs against whatever document exists at that
         // moment and is discarded on navigation, so the bridge has to be
@@ -169,6 +173,27 @@ const CONSOLE_BRIDGE: &str = r#"
   addEventListener('unhandledrejection', e => send('error', ['unhandled rejection', e.reason]));
 })();
 "#;
+
+/// Pet packs found on disk.
+///
+/// Shallow on purpose: this reports what is *there*, not what is valid.
+/// Validating needs the decoded sheet, which only the webview has, and a second
+/// implementation of the geometry rules here would be one more thing to keep in
+/// step with `packs/atlas.ts`.
+#[tauri::command]
+fn list_packs(app: tauri::AppHandle) -> Vec<packs::DiscoveredPack> {
+    let found = packs::discover(&app);
+    println!("[packs] discovered {}", found.len());
+    for p in &found {
+        println!(
+            "[packs]   {} ({}) sheet={:?}",
+            p.id,
+            p.root,
+            p.sheet.is_some()
+        );
+    }
+    found
+}
 
 /// Put text on the clipboard on the frontend's behalf.
 ///

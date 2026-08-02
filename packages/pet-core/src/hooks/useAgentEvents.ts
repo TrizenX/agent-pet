@@ -71,8 +71,8 @@ export function useAgentEvents(): AgentEventsState {
         sessions: reg.size,
         focusedState,
         focusedProject,
-      }).catch(() => {
-        /* running outside the shell, e.g. `vite` on its own */
+      }).catch((e) => {
+        console.warn(`[health] report_ready failed: ${e instanceof Error ? e.message : e}`);
       });
     };
     report();
