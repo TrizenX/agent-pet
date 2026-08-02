@@ -6,7 +6,7 @@
 //! Many developers run their terminal full-screen, so without this the pet
 //! disappears exactly when it matters.
 
-use tauri::{PhysicalPosition, WebviewWindow};
+use tauri::{Manager, PhysicalPosition, WebviewWindow};
 
 /// Make the window behave as a system overlay: visible on every Space,
 /// including the Space a full-screen app creates for itself.
@@ -257,30 +257,88 @@ mod macos {
 /// Anything outside the union of current monitors goes bottom-right of the
 /// primary.
 pub fn clamp_to_visible(win: &WebviewWindow, wanted: (i32, i32)) -> (i32, i32) {
-    let size = win.outer_size().unwrap_or_default();
-    let (w, h) = (size.width as i32, size.height as i32);
+    let (w, h) = window_size(win);
+    let monitors: Vec<_> = win
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| {
+            let (p, s) = (m.position(), m.size());
+            (p.x, p.y, s.width as i32, s.height as i32)
+        })
+        .collect();
 
-    let monitors = win.available_monitors().unwrap_or_default();
-    // Wholly on one screen, not merely mostly.
-    //
-    // "More than half overlaps" let a stored position survive a change to the
-    // window's own width — and when the window grew, the sprite (which sits
-    // centred in it) slid right by half the difference and hung off the edge
-    // while the check still called it visible. For a small always-on-top
-    // overlay there is no case where half-off is what anyone wanted.
-    let visible = monitors.iter().any(|m| {
-        let pos = m.position();
-        let ms = m.size();
-        wanted.0 >= pos.x
-            && wanted.1 >= pos.y
-            && wanted.0 + w <= pos.x + ms.width as i32
-            && wanted.1 + h <= pos.y + ms.height as i32
-    });
-
-    if visible {
+    if fits(wanted, (w, h), &monitors) {
         return wanted;
     }
     default_corner(win)
+}
+
+/// Whether a `size` window at `wanted` sits wholly inside one of `monitors`,
+/// each `(x, y, w, h)`.
+///
+/// Wholly on one screen, not merely mostly. "More than half overlaps" let a
+/// stored position survive a change to the window's own width — and when the
+/// window grew, the sprite (which sits centred in it) slid right by half the
+/// difference and hung off the edge while the check still called it visible.
+/// For a small always-on-top overlay there is no case where half-off is what
+/// anyone wanted.
+fn fits(wanted: (i32, i32), size: (i32, i32), monitors: &[(i32, i32, i32, i32)]) -> bool {
+    monitors.iter().any(|&(mx, my, mw, mh)| {
+        wanted.0 >= mx
+            && wanted.1 >= my
+            && wanted.0 + size.0 <= mx + mw
+            && wanted.1 + size.1 <= my + mh
+    })
+}
+
+/// The first of `candidates` that is a size a real window could have.
+///
+/// Zero is the trap. `outer_size()` is fallible *and*, under GTK before the
+/// window is realized, succeeds with 0x0 — so `unwrap_or_default()` collapsed
+/// the error and the zero into the same silent `0`. On Linux that placed a
+/// 420x430 window's top-left in the bottom-right corner, leaving 48x96 pixels
+/// of pet on a 1280x800 screen; and it quietly reduced `fits` above to "is the
+/// top-left corner on a monitor", which is the weaker test its own comment
+/// exists to reject. A window that reports no size has not told us anything,
+/// and the honest response is to keep asking rather than to substitute zero.
+fn first_real_size(candidates: impl IntoIterator<Item = (u32, u32)>) -> Option<(i32, i32)> {
+    candidates
+        .into_iter()
+        .find(|&(w, h)| w > 0 && h > 0)
+        .map(|(w, h)| (w as i32, h as i32))
+}
+
+/// The window's size in physical pixels, from whichever source can answer.
+///
+/// Falls back to the dimensions declared in `tauri.conf.json`, which is where
+/// this window's size came from in the first place, so the fallback cannot
+/// drift from the truth the way a hardcoded constant would.
+fn window_size(win: &WebviewWindow) -> (i32, i32) {
+    let reported = [win.outer_size(), win.inner_size()]
+        .into_iter()
+        .flatten()
+        .map(|s| (s.width, s.height));
+    if let Some(size) = first_real_size(reported) {
+        return size;
+    }
+
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let declared = win
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == win.label())
+        .map(|w| ((w.width * scale) as u32, (w.height * scale) as u32));
+
+    first_real_size(declared).unwrap_or_else(|| {
+        // Nothing left to ask. Say so: a window placed as if it had no size is
+        // the failure this whole function exists to prevent, and it must not be
+        // the one thing that happens silently.
+        eprintln!("[window] no source could report the window size; placement may be wrong");
+        (0, 0)
+    })
 }
 
 /// Bottom-right of the primary monitor, inset from the edges.
@@ -290,16 +348,35 @@ pub fn default_corner(win: &WebviewWindow) -> (i32, i32) {
     };
     let screen = monitor.size();
     let scale = monitor.scale_factor();
-    let size = win.outer_size().unwrap_or_default();
+    let (w, h) = window_size(win);
     let margin = (48.0 * scale) as i32;
     (
-        screen.width as i32 - size.width as i32 - margin,
-        screen.height as i32 - size.height as i32 - margin * 2,
+        screen.width as i32 - w - margin,
+        screen.height as i32 - h - margin * 2,
     )
 }
 
+/// Move the window, and say where it actually ended up.
+///
+/// The read-back is the point. `set_position` returns `Ok` on platforms that
+/// ignore it — under Wayland a client is not permitted to place its own window
+/// at all (spec §3.1, TZX-74) — so the return value says nothing about whether
+/// the pet moved. Asking the window where it is afterwards is the only answer
+/// that means anything, and it is how the Linux placement bug was visible from
+/// one line of output instead of a screenshot.
 pub fn place(win: &WebviewWindow, at: (i32, i32)) {
-    let _ = win.set_position(PhysicalPosition::new(at.0, at.1));
+    if let Err(e) = win.set_position(PhysicalPosition::new(at.0, at.1)) {
+        eprintln!("[window] could not move to {},{}: {e}", at.0, at.1);
+        return;
+    }
+    match win.outer_position() {
+        Ok(p) if (p.x, p.y) == at => println!("[window] at {},{}", at.0, at.1),
+        Ok(p) => println!(
+            "[window] asked for {},{} but the compositor placed it at {},{}",
+            at.0, at.1, p.x, p.y
+        ),
+        Err(e) => eprintln!("[window] moved to {},{} but cannot read it back: {e}", at.0, at.1),
+    }
 }
 
 /// Toggle click-through.
@@ -334,4 +411,53 @@ pub fn show(win: &WebviewWindow, click_through: bool) {
     let _ = win.show();
     apply_overlay_behaviour(win);
     set_click_through(win, click_through);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{first_real_size, fits};
+
+    /// The screen the containerised Linux run actually used.
+    const SCREEN: [(i32, i32, i32, i32); 1] = [(0, 0, 1280, 800)];
+    /// The pet's window, from tauri.conf.json.
+    const PET: (i32, i32) = (420, 430);
+
+    #[test]
+    fn a_window_wholly_on_screen_fits() {
+        assert!(fits((100, 100), PET, &SCREEN));
+        // Flush against the bottom-right corner is still inside.
+        assert!(fits((1280 - 420, 800 - 430), PET, &SCREEN));
+    }
+
+    #[test]
+    fn hanging_off_any_edge_does_not_fit() {
+        assert!(!fits((1000, 100), PET, &SCREEN), "off the right edge");
+        assert!(!fits((100, 600), PET, &SCREEN), "off the bottom edge");
+        assert!(!fits((-1, 100), PET, &SCREEN), "off the left edge");
+        assert!(!fits((100, -1), PET, &SCREEN), "off the top edge");
+    }
+
+    /// The Linux bug, as an assertion.
+    ///
+    /// `default_corner` put the window here because it believed the window was
+    /// 0x0. Only 48x96 pixels of a 420x430 pet were on screen — and the clamp
+    /// that exists to catch exactly that called the position visible, because
+    /// it was measuring the same zero.
+    #[test]
+    fn the_position_linux_produced_is_rejected_at_the_real_size() {
+        let off_screen = (1232, 704);
+        assert!(!fits(off_screen, PET, &SCREEN));
+        assert!(
+            fits(off_screen, (0, 0), &SCREEN),
+            "a zero size makes the clamp accept it — which is why zero must never reach it"
+        );
+    }
+
+    #[test]
+    fn a_zero_size_is_not_an_answer() {
+        assert_eq!(first_real_size([(0, 0)]), None);
+        assert_eq!(first_real_size([(0, 430)]), None, "half a size is no size");
+        assert_eq!(first_real_size([(0, 0), (420, 430)]), Some((420, 430)));
+        assert_eq!(first_real_size([]), None);
+    }
 }
