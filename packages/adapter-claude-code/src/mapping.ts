@@ -110,8 +110,28 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
       // and the next event says what that is.
       return [{ type: "AGENT_IDLE" }];
 
+    /**
+     * Deliberately ignored, and this was a real bug for five milestones.
+     *
+     * `PermissionRequest` fires when the permission system *evaluates* a tool —
+     * including every call a rule auto-approves. Mapping it to
+     * `APPROVAL_NEEDED` meant the pet asked "May I?" for every bash command in
+     * a normal session, and because it arrives *after* `PreToolUse`, the pet
+     * parked in `waiting_approval` and the working states were never visible at
+     * all. Observed live: an entire session in which the pet reached exactly
+     * three states — asleep, digging, and asking.
+     *
+     * Nothing in the payload distinguishes "auto-allowed" from "asking the
+     * user": `permission_mode` is the session's mode, and
+     * `permission_suggestions` is present either way. So this event cannot
+     * carry the meaning on its own.
+     *
+     * The signal that actually means a human is being asked is
+     * `Notification` / `permission_prompt`, below — and it is the one that was
+     * already right.
+     */
     case "PermissionRequest":
-      return [{ type: "APPROVAL_NEEDED", tool }];
+      return [];
     case "PermissionDenied":
       return [{ type: "APPROVAL_RESOLVED", granted: false }];
 

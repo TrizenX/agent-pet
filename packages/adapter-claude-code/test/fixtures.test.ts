@@ -34,7 +34,7 @@ const EXPECTED: Record<string, string | null> = {
   PreToolUse: "TOOL_START",
   PostToolUse: "TOOL_DONE",
   PostToolUseFailure: "TOOL_DONE",
-  PermissionRequest: "APPROVAL_NEEDED",
+  PermissionRequest: null,
   PermissionDenied: "APPROVAL_RESOLVED",
   Stop: "TURN_END",
   StopFailure: "AGENT_BLOCKED",
@@ -90,7 +90,12 @@ describe("recorded fixtures", () => {
     }
 
     const want = EXPECTED[hook];
-    expect(want, `${hook} is not in the expected-event table`).toBeDefined();
+    expect(want, `${hook} is not in the expected-event table`).not.toBeUndefined();
+    if (want === null) {
+      // Registered so the shape stays pinned, but deliberately not a state.
+      expect(events).toEqual([]);
+      return;
+    }
     expect(events).toHaveLength(1);
     expect(events[0]?.type).toBe(want);
   });

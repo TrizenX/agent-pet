@@ -29,8 +29,6 @@ export type PlaybackMode =
   | "loop"
   /** Play once, then hold the final frame until the state changes. */
   | "once-hold"
-  /** Play once, then fall through to the follow-up state's animation. */
-  | "once-then"
   /** Render a single frame, no animation at all. Required by I6 when sleeping. */
   | "static";
 
@@ -39,9 +37,6 @@ export interface StateAnimation {
   /** Multiplier on the pack's base fps. */
   readonly fpsScale: number;
   readonly mode: PlaybackMode;
-  /** Only meaningful for "once-then". Not named `then` — a thenable-looking
-   *  object misbehaves the moment anything awaits it. */
-  readonly nextState?: PetState;
   /** Frame index to hold when mode is "static". */
   readonly staticFrame?: number;
 }
@@ -59,7 +54,16 @@ export const STATE_ANIMATIONS: Readonly<Record<PetState, StateAnimation>> = Obje
   // I6: zero animation while asleep. Not "low fps" — none.
   sleeping: { row: "waiting", fpsScale: 0, mode: "static", staticFrame: 0 },
   idle: { row: "idle", fpsScale: 1, mode: "loop" },
-  attentive: { row: "jumping", fpsScale: 1, mode: "once-then", nextState: "idle" },
+  /**
+   * Thinking, which can last a while.
+   *
+   * Was play-once-and-hold, which froze the pet on the last frame of a jump for
+   * as long as the model was reasoning — reported from real use as "the pet
+   * just stands still while it thinks". A slow loop reads as alert; a held
+   * frame reads as broken. Slower than `celebrating`, which shares this row, so
+   * the two are told apart by more than the trophy glyph.
+   */
+  attentive: { row: "jumping", fpsScale: 0.7, mode: "loop" },
   "working.digging": { row: "running-right", fpsScale: 1, mode: "loop" },
   "working.typing": { row: "running", fpsScale: 1, mode: "loop" },
   "working.reading": { row: "review", fpsScale: 1, mode: "loop" },
