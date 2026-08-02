@@ -261,6 +261,34 @@ export const petMachine = setup({
       { target: ".idle", actions: ["touch", "clearActivity"] },
     ],
 
+    /**
+     * A tool finished, from wherever the pet happens to be.
+     *
+     * `working` has its own, narrower handler below — stay put and hop — and a
+     * descendant's handler wins, so ordinary tool sequences are unaffected.
+     * This is the case where the pet is somewhere else entirely, and the only
+     * one that matters is `waiting_approval`.
+     *
+     * Granting permission produces no event of its own. A denial arrives as
+     * `APPROVAL_RESOLVED`; an approval arrives as nothing at all, and the next
+     * thing the pet hears is the finished tool. So without this it went on
+     * saying "May I?" after the user had already said yes — until the next tool
+     * call or the thirty-minute decay, whichever came first. Reported exactly
+     * that way.
+     *
+     * It was also an I3 violation in plain sight: `waiting_approval` was
+     * swallowing an incoming event, which §2 says no state may do.
+     */
+    TOOL_DONE: [
+      {
+        guard: "toolFailed",
+        target: ".error",
+        actions: ["touch", "noteFailure", "clearActivity"],
+      },
+      { guard: "toolInterrupted", target: ".idle", actions: ["touch", "clearActivity"] },
+      { target: ".working.generic", actions: ["touch", "hop", "clearActivity"] },
+    ],
+
     WATCHDOG: { guard: "isStale", target: ".sleeping", actions: ["touch", "clearActivity"] },
   },
 

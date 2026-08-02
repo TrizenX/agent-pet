@@ -97,6 +97,10 @@ describe("§7.2 — root transitions apply from every state (I3)", () => {
     ["APPROVAL_NEEDED", ev({ type: "APPROVAL_NEEDED" }), "waiting_approval"],
     ["AGENT_BLOCKED", ev({ type: "AGENT_BLOCKED", reason: "overloaded" }), "exhausted"],
     ["TOOL_START", tool("bash"), "working.digging"],
+    // A failed tool lands in `error` from anywhere. Added after
+    // `waiting_approval` was found swallowing TOOL_DONE outright, which I3
+    // forbids in as many words.
+    ["TOOL_DONE(failed)", done(false), "error"],
   ];
 
   // The three states most likely to swallow an event are exactly the ones with
@@ -382,6 +386,33 @@ describe("the activity the pet reports", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("stops asking once the user has said yes", () => {
+    // Granting permission produces no event of its own — a denial arrives as
+    // APPROVAL_RESOLVED, an approval arrives as nothing — so the finished tool
+    // is the only signal that the answer came. The pet used to go on saying
+    // "May I?" until the next tool call or the thirty-minute decay.
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "bash", at: 1_000 } as PetMachineEvent);
+    actor.send({ type: "APPROVAL_NEEDED", at: 2_000 } as PetMachineEvent);
+    expect(toPetState(actor.getSnapshot().value)).toBe("waiting_approval");
+
+    actor.send({ type: "TOOL_DONE", ok: true, tool: "bash", at: 3_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("working.generic");
+    actor.stop();
+  });
+
+  it("still stays put and hops when a tool finishes mid-work", () => {
+    // The narrower handler inside `working` must keep winning, or every
+    // successful tool would knock the pet out of the substate it is animating.
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "bash", at: 1_000 } as PetMachineEvent);
+    actor.send({ type: "TOOL_DONE", ok: true, tool: "bash", at: 2_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("working.digging");
+    actor.stop();
   });
 
   it("does not carry an activity out of the work states", () => {
