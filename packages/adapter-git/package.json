@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./mapping": "./src/mapping.ts"
+    "./mapping": "./src/mapping.ts",
+    "./install": "./src/install.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
