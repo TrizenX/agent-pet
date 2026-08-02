@@ -38,9 +38,15 @@ describe("state -> row mapping", () => {
     expect(s.fpsScale).toBe(0);
   });
 
-  it("names a follow-up state for every once-then animation", () => {
+  it("never asks the renderer for a mode it does not implement", () => {
+    // `once-then` and its `nextState` were declared, set on `attentive`, and
+    // never read — the renderer plays every non-loop mode as once-and-hold. So
+    // the pet froze mid-jump for the whole time the model was thinking, and the
+    // config that was supposed to prevent it did nothing. Dead config is worse
+    // than no config: it reads like a decision that was made.
+    const implemented = new Set(["loop", "once-hold", "static"]);
     for (const [state, anim] of Object.entries(STATE_ANIMATIONS)) {
-      if (anim.mode === "once-then") expect(anim.nextState, state).toBeDefined();
+      expect(implemented.has(anim.mode), `${state} uses ${anim.mode}`).toBe(true);
     }
   });
 

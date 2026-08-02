@@ -101,10 +101,25 @@ describe("mapping — hook events", () => {
     ).toMatchObject({ type: "TOOL_DONE", ok: false, tool: "bash" });
   });
 
-  it("PermissionRequest carries the tool being approved", () => {
-    expect(one({ ...BASE, hook_event_name: "PermissionRequest", tool_name: "Bash" })).toMatchObject(
-      { type: "APPROVAL_NEEDED", tool: "bash" },
-    );
+  it("PermissionRequest is not an approval prompt", () => {
+    // It fires on every permission *evaluation*, auto-approved ones included.
+    // Treating it as a prompt made the pet ask "May I?" for every bash command
+    // and, because it arrives after PreToolUse, parked it there — an entire
+    // observed session reached only three states: asleep, digging, asking.
+    expect(
+      claudeCodeAdapter.toPetEvents(
+        { ...BASE, hook_event_name: "PermissionRequest", tool_name: "Bash" },
+        { receivedAt: 1 },
+      ),
+    ).toEqual([]);
+  });
+
+  it("a real prompt still reaches the pet", () => {
+    // The signal that means a human is actually being asked, and the one that
+    // was right all along.
+    expect(
+      one({ ...BASE, hook_event_name: "Notification", notification_type: "permission_prompt" }),
+    ).toMatchObject({ type: "APPROVAL_NEEDED" });
   });
 });
 
