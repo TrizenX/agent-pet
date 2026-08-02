@@ -127,11 +127,6 @@ body {
   font-weight: 600;
 }
 
-/* A session that has been quiet for a minute and a half is still listed, but it
-   should not read as loudly as one doing work right now. */
-.pet-bubble-line[data-quiet] {
-  opacity: 0.5;
-}
 
 /* The project name is shown in full.
    It used to be capped at 38% and ellipsised, so "agent-pet" read as

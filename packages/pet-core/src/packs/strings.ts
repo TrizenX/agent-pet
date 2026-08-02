@@ -35,7 +35,6 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
     // is the most actionable line there is — it says which ones want a human —
     // and it used to render as "…", because `idle` had no string at all.
     idle: "Your turn",
-    sleeping: "Asleep",
     attentive: "Hmm…",
     // The gap between two tool calls, which is the model deciding what to do
     // next — so it says that. It used to say "On it!", which is the vaguest
@@ -66,7 +65,6 @@ export const STRINGS: Readonly<Record<Locale, Partial<Record<PetState, string>>>
    */
   vi: {
     idle: "Xong, tới bạn",
-    sleeping: "Zzz…",
     attentive: "Để coi…",
     "working.generic": "Nghĩ tí…",
     "working.typing": "Nghĩ tí…",
@@ -156,7 +154,6 @@ const ACTIVITY_STATES: ReadonlySet<PetState> = new Set<PetState>([
 const CHATTY: Readonly<Record<Locale, Partial<Record<PetState, string>>>> = {
   en: {
     idle: "All done — your move",
-    sleeping: "Zzz…",
     attentive: "Let me have a think…",
     "working.delegating": "Called in some help",
     compacting: "Just tidying my memory",
@@ -168,7 +165,6 @@ const CHATTY: Readonly<Record<Locale, Partial<Record<PetState, string>>>> = {
   },
   vi: {
     idle: "Xong rồi, tới bạn nè",
-    sleeping: "Zzz…",
     attentive: "Để mình coi đã…",
     "working.delegating": "Gọi viện binh rồi nè",
     compacting: "Dọn lại trí nhớ chút nha",

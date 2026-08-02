@@ -24,8 +24,6 @@ export interface SpeechLine {
   readonly text: string;
   /** Waiting on the user. Sorted to the top and marked. */
   readonly attention?: boolean;
-  /** Long silent. Still listed, but it should not compete with live work. */
-  readonly quiet?: boolean;
 }
 
 /**
@@ -82,12 +80,7 @@ export function SpeechBubble({ lines }: { readonly lines: readonly SpeechLine[] 
   return (
     <div className="pet-bubble" role="status" data-rows={lines.length} ref={setNode}>
       {lines.map((line) => (
-        <div
-          className="pet-bubble-line"
-          key={line.id}
-          data-attention={line.attention || undefined}
-          data-quiet={line.quiet || undefined}
-        >
+        <div className="pet-bubble-line" key={line.id} data-attention={line.attention || undefined}>
           {many && line.project ? <span className="pet-bubble-project">{line.project}</span> : null}
           <span className="pet-bubble-text">{line.text}</span>
         </div>
