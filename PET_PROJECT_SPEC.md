@@ -365,7 +365,11 @@ Unknown tool names must fall through to `other`. Claude Code adds tools; the pet
 
 ### 7.1 States
 
-`sleeping` · `idle` · `attentive` · `working{ digging, typing, reading, generic }` · `waiting_approval` · `error` · `exhausted` · `celebrating`
+`sleeping` · `idle` · `attentive` · `working{ digging, typing, reading, delegating, generic }` · `compacting` · `waiting_input` · `waiting_approval` · `error` · `exhausted` · `celebrating`
+
+Fourteen, on nine atlas rows. `waiting_input` shares row 3 with `waiting_approval` because both are the pet turning to face the user; `working.delegating` shares row 7; `compacting` shares row 8. The glyph layer (§9.5) is what separates them, which is what it is for.
+
+**`waiting_input` is not a variant of `idle`.** Both mean the agent stopped; only one means it stopped *on you*. Folding a question into `AGENT_IDLE` — which is what M5 found — made a question indistinguishable from an empty prompt, and it is an attention state for the same reason an approval is: it outranks a busier session (§8.2) and the watchdog leaves it alone.
 
 **`exhausted` is new and is the highest-value state in the product.** When the agent is rate-limited, over-quota, or unauthenticated, the terminal shows a retry spinner that looks identical to real work. The pet showing a distinct flat-on-its-back pose is the fastest rate-limit indicator the user has. It is the clearest expression of §1.1.
 
@@ -384,6 +388,13 @@ Root-level (`on:` at machine root — applies from **every** state, satisfying I
 | `PROMPT_SUBMITTED` | `attentive` |
 | `TOOL_START` | `working.<byToolKind>` |
 | `SESSION_START` | `idle` |
+| `INPUT_NEEDED` | `waiting_input` |
+| `COMPACTING` | `compacting` |
+| `COMPACTED` | `idle` |
+| `SUBAGENT_START` | `working.delegating` |
+| `SUBAGENT_END` | `working.generic` |
+
+Every one of these clears the recorded activity (the `ToolKind` the bubble names, §9.4). Three separate transitions shipped in M5 without doing so; the rule is that **anything leaving work forgets what the work was**, because a pet still saying "Crunching…" after the command finished is worse than one saying nothing.
 
 Per-state:
 
@@ -398,6 +409,9 @@ Per-state:
 | any | `TURN_END` **and** `!celebrationWorthy` | `idle` |
 | `celebrating` | `after 4 s` | `idle` |
 | `error` | `after 3 s` | `idle` |
+| `working.*` | `after ACTIVITY_DECAY` | `idle`, activity cleared — the path that exists for a hook that never arrived |
+| `compacting` | `after ACTIVITY_DECAY` | `idle` — the backstop; `COMPACTED` is the real end |
+| `waiting_input` | `after APPROVAL_DECAY` | `idle`. Watchdog-exempt, like `waiting_approval`: silence means the user stepped away, which is when the question most needs to still be there |
 | `exhausted` | `PROMPT_SUBMITTED` \| `TOOL_START` \| `after 10 min` | `idle` |
 | `idle` | `after 90 s` | `sleeping` |
 | `attentive`, `working.*` | `after 5 min` | `idle` — **added during TZX-67**; both were left without a decay path, and the watchdog alone does not satisfy I4 |

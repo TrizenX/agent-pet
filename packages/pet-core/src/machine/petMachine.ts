@@ -192,12 +192,27 @@ export const petMachine = setup({
     INPUT_NEEDED: { target: ".waiting_input", actions: ["touch", "clearActivity"] },
     COMPACTING: { target: ".compacting", actions: ["touch", "clearActivity"] },
     /**
-     * The delegated agent came back. There is no start hook to pair with, so
-     * this can arrive in any state — landing in `working.generic` is right for
-     * the case it was sent for and harmless everywhere else, because whatever
-     * the agent does next sends its own event.
+     * A delegated agent, both ends.
+     *
+     * `SUBAGENT_START` sat unhandled here until the M5 review established that
+     * `SubagentStart` is a real hook — the comment that used to be on this
+     * transition claimed no start hook existed, which was simply wrong, and the
+     * pet was inferring delegation from a tool name instead of being told.
+     *
+     * `SUBAGENT_END` landing in `working.generic` is right for the case it was
+     * sent for and harmless elsewhere: whatever the agent does next sends its
+     * own event.
      */
+    SUBAGENT_START: {
+      target: ".working.delegating",
+      actions: ["touch", "clearBlock", "clearActivity"],
+    },
     SUBAGENT_END: { target: ".working.generic", actions: ["touch", "clearActivity"] },
+    /**
+     * Compaction finished. Without this the state unwound on a five-minute
+     * decay, which is a guess wearing the clothes of a fact.
+     */
+    COMPACTED: { target: ".idle", actions: ["touch", "clearActivity"] },
 
     TOOL_START: [
       {
@@ -257,7 +272,13 @@ export const petMachine = setup({
       initial: "generic",
       // Same reasoning as `attentive`. Sits on the parent so that moving
       // between substates does not reset the clock on a stalled tool call.
-      after: { ACTIVITY_DECAY: "idle" },
+      //
+      // Clears the activity, like every other exit from work. This one was
+      // missed twice over — it is the third instance of the same bug in this
+      // milestone — and it is the worst place to miss it: this path exists
+      // precisely for a hook that never arrived, which is exactly when a stale
+      // "Crunching…" is most likely to be on screen and most likely to be a lie.
+      after: { ACTIVITY_DECAY: { target: "idle", actions: "clearActivity" } },
       on: {
         TOOL_DONE: [
           {

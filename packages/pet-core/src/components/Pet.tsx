@@ -54,6 +54,18 @@ export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps)
   const row = facing < 0 && anim.row === "running-right" ? "running-left" : anim.row;
   const resolved = useMemo(() => resolveRow(pack, row), [pack, row]);
 
+  /**
+   * Every other working row has no left-facing twin, so mirror it.
+   *
+   * The pet paces in all four working states but only `working.digging` uses
+   * `running-right`, so before this the other three walked left while still
+   * drawn facing right — the window slid one way and the sprite moonwalked.
+   * `resolveRow` may already have flipped a mirrored row 1; flipping twice
+   * would face the wrong way, hence the xor.
+   */
+  const mirrored = facing < 0 && row === anim.row;
+  const flip = resolved.flip !== mirrored;
+
   const fw = FRAME_WIDTH * scale;
   const fh = FRAME_HEIGHT * scale;
   useStepKeyframes(fw);
@@ -94,7 +106,7 @@ export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps)
         backgroundSize: `${fw * COLUMNS}px ${fh * pack.geometry.rows}px`,
         backgroundPositionX: `${-frameIndex * fw}px`,
         backgroundPositionY: `${-resolved.row * fh}px`,
-        transform: resolved.flip ? "scaleX(-1)" : undefined,
+        transform: flip ? "scaleX(-1)" : undefined,
         animation: still
           ? "none"
           : `pet-step-${frames} ${(frames / fps).toFixed(3)}s steps(${frames}) ${

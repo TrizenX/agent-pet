@@ -19,6 +19,7 @@ interface RawHook {
   is_error?: unknown;
   is_interrupt?: unknown;
   notification_type?: unknown;
+  agent_type?: unknown;
   reason?: unknown;
   error_type?: unknown;
 }
@@ -68,19 +69,46 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
       return [{ type: "TOOL_DONE", ok: false, tool, interrupted: raw.is_interrupt === true }];
 
     /**
-     * Compaction. Registered because it is one of the longest visible pauses a
-     * session has, and until now the pet spent it looking like it had hung.
+     * Compaction, both ends of it. One of the longest visible pauses a session
+     * has, and until M5 the pet spent it looking like it had hung.
+     *
+     * `PostCompact` matters as much as `PreCompact`: without it the state has
+     * no authoritative end and unwinds on a five-minute decay timer, which is a
+     * guess dressed as a fact.
      */
     case "PreCompact":
       return [{ type: "COMPACTING" }];
+    case "PostCompact":
+      return [{ type: "COMPACTED" }];
 
     /**
-     * A delegated agent finished. There is no matching start hook — the pet
-     * learns a subagent began from `PreToolUse` on a delegating tool — so this
-     * is what closes the bracket.
+     * A delegated agent, both ends.
+     *
+     * `SubagentStart` carries `agent_type`, which is a better signal than
+     * inferring a delegation from a tool name — and it is what makes
+     * `SUBAGENT_START` mean something after sitting unused in the wire format
+     * since M0.
      */
+    case "SubagentStart":
+      return [
+        {
+          type: "SUBAGENT_START",
+          ...(typeof raw.agent_type === "string" ? { agentType: raw.agent_type } : {}),
+        },
+      ];
     case "SubagentStop":
       return [{ type: "SUBAGENT_END" }];
+
+    /**
+     * An MCP server asking the user something. Same claim on their attention as
+     * a permission prompt, and it was being dropped.
+     */
+    case "Elicitation":
+      return [{ type: "INPUT_NEEDED" }];
+    case "ElicitationResult":
+      // Not a state of its own: the agent goes back to whatever it was doing,
+      // and the next event says what that is.
+      return [{ type: "AGENT_IDLE" }];
 
     case "PermissionRequest":
       return [{ type: "APPROVAL_NEEDED", tool }];
@@ -146,7 +174,11 @@ export const claudeCodeAdapter: PetAdapter = {
           Stop: plain,
           StopFailure: plain,
           PreCompact: plain,
-          SubagentStop: plain,
+          PostCompact: plain,
+          SubagentStart: matched,
+          SubagentStop: matched,
+          Elicitation: matched,
+          ElicitationResult: matched,
         },
       },
       null,

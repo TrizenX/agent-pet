@@ -74,7 +74,8 @@ fn main() {
             gallery::install_pack,
             gallery::select_pack,
             gallery::uninstall_pack,
-            walk::set_walking
+            walk::set_walking,
+            walk::halt_walking
         ])
         // `eval` during setup runs against whatever document exists at that
         // moment and is discarded on navigation, so the bridge has to be

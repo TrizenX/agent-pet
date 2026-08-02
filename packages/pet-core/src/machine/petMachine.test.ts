@@ -363,6 +363,26 @@ describe("the activity the pet reports", () => {
     actor.stop();
   });
 
+  it("forgets the tool when the work decays away, not just when it ends", () => {
+    // The decay is the one exit that exists for a hook that never arrived —
+    // the single most likely way to end up with a stale word on screen, and
+    // the third place in this milestone that forgot to clear.
+    vi.useFakeTimers();
+    try {
+      const actor = createActor(petMachine).start();
+      actor.send({ type: "TOOL_START", tool: "bash", at: 1_000 } as PetMachineEvent);
+      expect(actor.getSnapshot().context.activity).toBe("bash");
+
+      vi.advanceTimersByTime(DELAYS.ACTIVITY_DECAY + 50);
+
+      expect(toPetState(actor.getSnapshot().value)).toBe("idle");
+      expect(actor.getSnapshot().context.activity).toBeNull();
+      actor.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not carry an activity out of the work states", () => {
     const actor = createActor(petMachine).start();
     actor.send({ type: "TOOL_START", tool: "network", at: 1_000 } as PetMachineEvent);

@@ -165,3 +165,39 @@ describe("mapping — never throws", () => {
     expect(e.type).toBe("TURN_END");
   });
 });
+
+describe("hooks M5 added, and what they are for", () => {
+  const at = 1_000;
+  const map = (raw: Record<string, unknown>) =>
+    claudeCodeAdapter.toPetEvents({ session_id: "s", cwd: "/w/p", ...raw }, { receivedAt: at });
+
+  it("brackets compaction at both ends", () => {
+    // Only PreCompact was registered at first, so the state unwound on a
+    // five-minute decay — a guess wearing the clothes of a fact.
+    expect(map({ hook_event_name: "PreCompact" })[0]).toMatchObject({ type: "COMPACTING" });
+    expect(map({ hook_event_name: "PostCompact" })[0]).toMatchObject({ type: "COMPACTED" });
+  });
+
+  it("brackets a subagent at both ends, and keeps its type", () => {
+    // SUBAGENT_START sat unused in the wire format from M0 until the review
+    // established that SubagentStart is a real hook — the pet had been
+    // inferring delegation from a tool name instead of being told.
+    expect(map({ hook_event_name: "SubagentStart", agent_type: "Explore" })[0]).toMatchObject({
+      type: "SUBAGENT_START",
+      agentType: "Explore",
+    });
+    expect(map({ hook_event_name: "SubagentStop" })[0]).toMatchObject({ type: "SUBAGENT_END" });
+  });
+
+  it("omits the agent type rather than inventing one", () => {
+    expect(map({ hook_event_name: "SubagentStart" })[0]).not.toHaveProperty("agentType");
+    expect(map({ hook_event_name: "SubagentStart", agent_type: 7 })[0]).not.toHaveProperty(
+      "agentType",
+    );
+  });
+
+  it("treats an MCP server asking a question as a claim on the user", () => {
+    expect(map({ hook_event_name: "Elicitation" })[0]).toMatchObject({ type: "INPUT_NEEDED" });
+    expect(map({ hook_event_name: "ElicitationResult" })[0]).toMatchObject({ type: "AGENT_IDLE" });
+  });
+});

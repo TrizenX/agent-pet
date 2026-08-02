@@ -66,7 +66,7 @@ describe("recorded fixtures", () => {
       const want = {
         permission_prompt: "APPROVAL_NEEDED",
         idle_prompt: "AGENT_IDLE",
-        agent_needs_input: "AGENT_IDLE",
+        agent_needs_input: "INPUT_NEEDED",
         agent_completed: "TURN_END",
       }[raw.notification_type as string];
       if (want) {

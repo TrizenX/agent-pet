@@ -17,6 +17,7 @@
 //! deliberately not while waiting on an approval: a request that wanders away
 //! from where the user last saw it is worse than one that sits still.
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -32,6 +33,15 @@ const STEP_PX: i32 = 4;
 const RANGE_PX: i32 = 120;
 /// A jump larger than one step did not come from us.
 const DRAG_THRESHOLD_PX: i32 = STEP_PX * 3;
+/// How many of our own recent moves to remember.
+///
+/// One is not enough. `set_position` is dispatched differently depending on the
+/// caller's thread: from the main thread it applies inline, from the walker's
+/// tokio task it is posted to the event loop and drains later. So a move the
+/// walker issued can land *after* a move `halt` made, and comparing against
+/// only the most recent command would read that straggler as a hand on the
+/// window. Eight covers about two thirds of a second of queued steps.
+const COMMAND_MEMORY: usize = 8;
 
 #[derive(Default)]
 pub struct Walk {
@@ -45,14 +55,24 @@ pub struct Walk {
     /// Bumped on every start, so a task from a previous burst exits instead of
     /// two of them fighting over the window.
     generation: u64,
-    /// The last position we asked for, to tell our own moves from the user's.
-    commanded: Option<(i32, i32)>,
+    /// Positions we recently asked for, to tell our own moves from the user's.
+    commanded: VecDeque<(i32, i32)>,
 }
 
 impl Walk {
-    /// True while a position is being driven from here.
+    /// True while this module owns the window's position.
+    ///
+    /// Stays true after the pet stops pacing, because home outlives a burst of
+    /// work — and because a straggling move can still arrive after it.
     pub fn is_driving(&self) -> bool {
         self.home.is_some()
+    }
+
+    fn note_command(&mut self, at: (i32, i32)) {
+        if self.commanded.len() == COMMAND_MEMORY {
+            self.commanded.pop_front();
+        }
+        self.commanded.push_back(at);
     }
 
     /// Whether a `Moved` event came from the user rather than from us.
@@ -61,17 +81,18 @@ impl Walk {
     /// is not enough to tell them apart. A move we did not command, or one
     /// further than a single step could explain, is a hand on the window.
     pub fn is_user_drag(&self, to: (i32, i32)) -> bool {
-        match self.commanded {
-            None => true,
-            Some((cx, cy)) => (to.0 - cx).abs() > DRAG_THRESHOLD_PX || (to.1 - cy).abs() > 0,
-        }
+        !self
+            .commanded
+            .iter()
+            .any(|&(cx, cy)| (to.0 - cx).abs() <= DRAG_THRESHOLD_PX && to.1 == cy)
     }
 
     /// The user moved the pet mid-stride. Their position wins.
     pub fn rehome(&mut self, to: (i32, i32)) {
         self.home = Some(to);
         self.offset = 0;
-        self.commanded = Some(to);
+        self.commanded.clear();
+        self.note_command(to);
     }
 
     /// Where the pet would sit if it stopped now — what gets persisted.
@@ -114,7 +135,7 @@ pub fn set_walking(app: tauri::AppHandle, on: bool) {
             return;
         };
         walk.home = Some((pos.x, pos.y));
-        walk.commanded = walk.home;
+        walk.note_command((pos.x, pos.y));
         walk.dir = 1;
     }
     walk.generation += 1;
@@ -128,23 +149,43 @@ pub fn set_walking(app: tauri::AppHandle, on: bool) {
     spawn_walker(app, generation);
 }
 
-/// Stop immediately and forget home. For the tray toggle and for shutdown,
-/// where walking politely back is not what anyone wants.
+/// Stop now, mid-stride. For the tray toggle, for reduced motion, and for
+/// shutdown — walking politely back is not what someone who just said "stop
+/// moving" asked for.
+///
+/// Home is deliberately *kept*. It is where the pet lives, not a lease held for
+/// the duration of one burst, and keeping it is what lets `remember_position`
+/// still recognise a straggling move as ours rather than as a drag.
+#[tauri::command]
+pub fn halt_walking(app: tauri::AppHandle) {
+    halt(&app);
+}
+
 pub fn halt(app: &tauri::AppHandle) {
     let Some(shared) = app.try_state::<Arc<crate::tray::AppState>>() else {
         return;
     };
+    let Some(win) = app.get_webview_window("pet") else {
+        return;
+    };
+
     let mut walk = shared.walk.lock().expect("walk poisoned");
     walk.working = false;
     walk.generation += 1;
-    let home = walk.home.take();
     walk.offset = 0;
-    walk.commanded = None;
+    let Some(home) = walk.home else {
+        return;
+    };
+    // Clamped like every other placement. `home` was valid when it was
+    // captured; a display can be unplugged during a multi-minute agent run, and
+    // teleporting to a coordinate that no longer exists leaves the pet off
+    // every screen with no timer left running to rescue it.
+    let target = window::clamp_to_visible(&win, home);
+    walk.home = Some(target);
+    walk.note_command(target);
     drop(walk);
 
-    if let (Some(home), Some(win)) = (home, app.get_webview_window("pet")) {
-        window::place(&win, home);
-    }
+    window::place(&win, target);
 }
 
 fn spawn_walker(app: tauri::AppHandle, generation: u64) {
@@ -187,10 +228,14 @@ fn spawn_walker(app: tauri::AppHandle, generation: u64) {
                 };
                 walk.dir = if walk.offset > 0 { -1 } else { 1 };
                 if walk.offset == 0 {
-                    walk.commanded = Some(home);
+                    // Clamped, for the same reason `halt` clamps: this is the
+                    // one placement that does not go through the step below.
+                    let settled = window::clamp_to_visible(&win, home);
+                    walk.home = Some(settled);
+                    walk.note_command(settled);
                     walk.generation += 1;
                     drop(walk);
-                    window::place(&win, home);
+                    window::place(&win, settled);
                     let _ = app.emit("pet-walk", 0i32);
                     return;
                 }
@@ -198,7 +243,7 @@ fn spawn_walker(app: tauri::AppHandle, generation: u64) {
 
             let target = window::clamp_to_visible(&win, (home.0 + walk.offset, home.1));
             let dir = walk.dir;
-            walk.commanded = Some(target);
+            walk.note_command(target);
             drop(walk);
 
             window::place(&win, target);
@@ -216,4 +261,103 @@ fn spawn_walker(app: tauri::AppHandle, generation: u64) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn walking_at(home: (i32, i32), commands: &[(i32, i32)]) -> Walk {
+        let mut w = Walk {
+            home: Some(home),
+            ..Default::default()
+        };
+        for &c in commands {
+            w.note_command(c);
+        }
+        w
+    }
+
+    #[test]
+    fn recognises_its_own_step_as_its_own() {
+        let w = walking_at((100, 50), &[(104, 50)]);
+        assert!(!w.is_user_drag((104, 50)));
+    }
+
+    #[test]
+    fn a_straggling_step_is_still_ours() {
+        // The race this memory exists for: `halt` places the window from the
+        // main thread and applies inline, while a step the walker issued from a
+        // tokio thread is still queued in the event loop. It lands afterwards.
+        // With a single remembered command it would read as a hand on the pet.
+        let w = walking_at((100, 50), &[(112, 50), (116, 50), (100, 50)]);
+        assert!(
+            !w.is_user_drag((116, 50)),
+            "an older step of ours is not a drag"
+        );
+        assert!(!w.is_user_drag((100, 50)), "and neither is the latest");
+    }
+
+    #[test]
+    fn forgets_far_enough_back_to_stay_a_drag_test() {
+        let mut w = walking_at((0, 0), &[]);
+        for i in 0..COMMAND_MEMORY as i32 + 4 {
+            w.note_command((i * 100, 0));
+        }
+        assert_eq!(w.commanded.len(), COMMAND_MEMORY);
+        assert!(w.is_user_drag((0, 0)), "the oldest command has aged out");
+    }
+
+    #[test]
+    fn a_move_we_never_asked_for_is_a_drag() {
+        let w = walking_at((100, 50), &[(104, 50)]);
+        assert!(w.is_user_drag((900, 50)), "somewhere else entirely");
+        assert!(w.is_user_drag((104, 400)), "same x, dragged vertically");
+    }
+
+    #[test]
+    fn nothing_commanded_yet_means_any_move_is_the_users() {
+        let w = Walk::default();
+        assert!(w.is_user_drag((10, 10)));
+    }
+
+    #[test]
+    fn rehoming_forgets_where_we_were_walking() {
+        // Otherwise the positions from the interrupted walk keep counting as
+        // ours, and a second drag to one of them would be ignored.
+        let mut w = walking_at((100, 50), &[(112, 50), (116, 50)]);
+        w.rehome((500, 300));
+
+        assert_eq!(w.resting_position((0, 0)), (500, 300));
+        assert_eq!(w.offset, 0);
+        assert!(w.is_user_drag((116, 50)), "the old walk is no longer ours");
+        assert!(!w.is_user_drag((500, 300)));
+    }
+
+    #[test]
+    fn resting_position_is_home_when_we_have_one() {
+        assert_eq!(walking_at((7, 9), &[]).resting_position((1, 2)), (7, 9));
+        assert_eq!(Walk::default().resting_position((1, 2)), (1, 2));
+    }
+
+    #[test]
+    fn homing_always_terminates() {
+        // The property that keeps I6 honest: the walk-home loop is what drops
+        // the timer, so an offset that never reaches zero is a clock that never
+        // stops. Mirrors the arithmetic in `spawn_walker`.
+        for start in [-RANGE_PX, -7, -1, 0, 1, 7, RANGE_PX] {
+            let mut offset = start;
+            let mut steps = 0;
+            while offset != 0 {
+                let step = STEP_PX * if offset > 0 { -1 } else { 1 };
+                offset = if offset.abs() <= STEP_PX {
+                    0
+                } else {
+                    offset + step
+                };
+                steps += 1;
+                assert!(steps < 1000, "offset {start} never reached home");
+            }
+        }
+    }
 }
