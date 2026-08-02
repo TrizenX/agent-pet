@@ -3,26 +3,25 @@
   "transcript_path": "/home/user/.agent/transcript.jsonl",
   "cwd": "/home/user/demo-project",
   "prompt_id": "prompt-0000",
-  "permission_mode": "acceptEdits",
+  "permission_mode": "default",
+  "agent_id": "agent-0000",
+  "agent_type": "Explore",
   "effort": {
     "level": "<redacted:string:4>"
   },
   "hook_event_name": "PostToolUse",
-  "tool_name": "Read",
+  "tool_name": "Bash",
   "tool_input": {
-    "file_path": "<redacted:string:51>",
-    "limit": 5
+    "command": "<redacted:string:255>",
+    "description": "<redacted:string:35>"
   },
   "tool_response": {
-    "type": "<redacted:string:4>",
-    "file": {
-      "filePath": "<redacted:string:51>",
-      "content": "<redacted:string:85>",
-      "numLines": 5,
-      "startLine": 1,
-      "totalLines": 28
-    }
+    "stdout": "<redacted:string:24>",
+    "stderr": "<redacted:string:0>",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
   },
   "tool_use_id": "toolu_0000",
-  "duration_ms": 14
+  "duration_ms": 32
 }

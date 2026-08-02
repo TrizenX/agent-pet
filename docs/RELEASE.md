@@ -18,7 +18,7 @@ waiting on something outside the repository.
 | | |
 | :-- | :-- |
 | **The 8-hour soak.** Six minutes exercises eviction; it does not surface a slow leak, and the last run had not reached steady state. |
-| **A real agent session end to end.** Everything measured so far is hand-posted payloads with recorded shapes. |
+| **An *interactive* agent session.** A headless one now drives the pet end to end (see [`artifacts/real-session/FINDINGS.md`](../artifacts/real-session/FINDINGS.md)) — but `-p` never emits a permission prompt, so `waiting_approval` and `exhausted`, the two highest-value states, remain unproven against a real agent. That needs a human at a keyboard. |
 | **`StopFailure` recorded from a real rate limit** (TZX-63). It is the sole input to `exhausted`, and that state has never been driven by a genuine event. |
 | **Release-build numbers.** Every measurement in `artifacts/` is a debug build. |
 | **One visual confirmation of the overlay** over a full-screen app. `screencapture` is refused for lack of Screen Recording permission, so the fix M1 and M2 both sit on has been measured and never seen. |

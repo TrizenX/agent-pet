@@ -9,11 +9,10 @@
   "effort": {
     "level": "<redacted:string:4>"
   },
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Bash",
-  "tool_input": {
-    "command": "<redacted:string:58>",
-    "description": "<redacted:string:30>"
-  },
-  "tool_use_id": "toolu_0000"
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "<redacted:string:203>",
+  "last_assistant_message": "<redacted:string:508>",
+  "background_tasks": [],
+  "session_crons": []
 }
