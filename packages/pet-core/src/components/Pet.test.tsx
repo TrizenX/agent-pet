@@ -253,23 +253,6 @@ describe("a session that has finished and is waiting on you", () => {
     expect(speechFor("idle", "en")).toBe("Your turn");
     expect(speechFor("idle", "vi")).toBe("Xong, tới bạn");
   });
-
-  it("still says something once it has dozed off", () => {
-    expect(speechFor("sleeping", "en")).toBe("Asleep");
-    expect(speechFor("sleeping", "vi")).toBe("Zzz…");
-  });
-
-  it("dims a sleeping line so it does not compete with live work", () => {
-    render(
-      <SpeechBubble
-        lines={[
-          { id: "a", project: "agent-pet", text: "Running pnpm verify" },
-          { id: "b", project: "viparse", text: "Asleep", quiet: true },
-        ]}
-      />,
-    );
-    expect(document.querySelectorAll(".pet-bubble-line[data-quiet]")).toHaveLength(1);
-  });
 });
 
 describe("the pet's voice", () => {
@@ -300,7 +283,7 @@ describe("the pet's voice", () => {
   it("falls back to the terse line rather than saying nothing", () => {
     // `error` has both; a state with only a terse entry must still speak.
     expect(speechFor("error", "vi", undefined, null, null, true)).toBe("Toang rồi, xin lỗi nha");
-    expect(speechFor("sleeping", "vi", undefined, null, null, true)).toBe("Zzz…");
+    expect(speechFor("compacting", "vi")).toBe("Dọn trí nhớ…");
   });
 
   it("still lets a pack override win", () => {

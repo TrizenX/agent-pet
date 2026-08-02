@@ -297,3 +297,59 @@ describe("what the pet is drawing", () => {
     expect(walks).toEqual([]);
   });
 });
+
+describe("a session that has gone quiet", () => {
+  it("drops out of the bubble once it is asleep", async () => {
+    // The bubble answers "what is happening". A row reading "Zzz…" answers a
+    // question nobody asked, and sits between the user and the sessions that
+    // are actually live.
+    //
+    // Driven by a session ending rather than by ninety seconds of silence:
+    // both land in `sleeping`, which is what the filter keys on, and one of
+    // them does not need the clock.
+    await mount();
+
+    await act(async () => {
+      hook({
+        hook_event_name: "PreToolUse",
+        session_id: "done",
+        cwd: "/w/viparse",
+        tool_name: "Bash",
+        tool_input: { command: "ls" },
+      });
+      hook({
+        hook_event_name: "PreToolUse",
+        session_id: "busy",
+        cwd: "/w/agent-pet",
+        tool_name: "Edit",
+        tool_input: { file_path: "/x/mapping.ts" },
+      });
+    });
+    expect(lines()).toHaveLength(2);
+
+    await act(async () => {
+      hook({ hook_event_name: "SessionEnd", session_id: "done", cwd: "/w/viparse" });
+    });
+
+    const remaining = lines();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toContain("mapping.ts");
+  });
+
+  it("says nothing at all when every session is asleep", async () => {
+    await mount();
+
+    await act(async () => {
+      hook({ hook_event_name: "PreToolUse", session_id: "a", cwd: "/w/p", tool_name: "Bash" });
+    });
+    expect(lines()).toHaveLength(1);
+
+    await act(async () => {
+      hook({ hook_event_name: "SessionEnd", session_id: "a", cwd: "/w/p" });
+    });
+
+    // No bubble, rather than a bubble saying nothing is happening. The sleeping
+    // sprite already says that.
+    expect(document.querySelector(".pet-bubble")).toBeNull();
+  });
+});

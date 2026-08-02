@@ -112,15 +112,25 @@ export function App() {
   // the same values. Capped: past a handful of rows the bubble stops being a
   // glance target, and the sessions beyond the cap are the least urgent ones by
   // construction — `orderForDisplay` puts whoever is waiting at the top.
+  // A session asleep is not a session doing anything, so it leaves the list.
+  //
+  // The bubble answers "what is happening"; a row reading "Zzz…" is an answer
+  // to a question nobody asked, and after a minute and a half of quiet it is
+  // just clutter between the user and the sessions that are live. The session
+  // itself stays in the registry — it is still counted, still evictable, and
+  // still comes straight back the moment it does something.
+  //
+  // Ninety seconds of `idle` first, which does say something worth reading:
+  // "your turn". This drops the line only once even that has gone stale.
+  const awake = snapshot.sessions.filter((s) => s.state !== "sleeping");
   // One session gets the pet's voice; several get a table. A chatty line is
   // lovely on its own and five of them are a wall of text.
-  const chatty = snapshot.sessions.length === 1;
-  const lines = snapshot.sessions.slice(0, MAX_BUBBLE_LINES).map((s) => ({
+  const chatty = awake.length === 1;
+  const lines = awake.slice(0, MAX_BUBBLE_LINES).map((s) => ({
     id: s.sessionId,
     project: s.project,
     text: speechFor(s.state, locale, undefined, s.activity, s.activityLabel, chatty) ?? "…",
     attention: needsAttention(s.state),
-    quiet: s.state === "sleeping",
   }));
   const said = lines.map((l) => l.text).join(" | ");
   useEffect(() => {
