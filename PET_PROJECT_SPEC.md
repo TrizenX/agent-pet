@@ -33,7 +33,7 @@ That test is the tiebreaker for every UX argument in this document. It promotes 
 
 - **Phase 1 (NOW):** agent pet driven by Claude Code hooks. One machine, one pet, many concurrent sessions.
 - **Phase 1.5 (NOW-ish, after M2 passes):** pet packs — compatible with the existing Petdex/Codex atlas format, so the thousands of pets already in the wild work on day one (§12, D10).
-- **Phase 2 *(later)*:** git-activity adapter (pet grows / sickens with commit activity).
+- **Phase 2 (done, M6):** git-activity adapter. The registry line was the only change `pet-core` needed, and no event type was added — but the exercise found `celebrationWorthy` silently depending on `PROMPT_SUBMITTED`, so every commit earned a trophy. See [`artifacts/m6/FINDINGS.md`](artifacts/m6/FINDINGS.md).
 - **Phase 3 *(later)*:** sync layer + an open **Pet Protocol** so pets from different tools and machines interact.
 
 The architecture is adapter-based so Phase 2 and 3 are pure additions. The Phase 3 protocol is the actual moat — Phase 1 hooks are a public API anyone can reimplement in a weekend. Every wire format in this spec is therefore versioned from day one.
@@ -228,6 +228,8 @@ export const ADAPTERS: readonly PetAdapter[] = [claudeCodeAdapter];
 ```
 
 Phase 2 adds one line here. Nothing else in `pet-core` changes. Invariant I5 is enforced by a test that greps the rest of `pet-core` for forbidden strings.
+
+**Tested in M6 and substantially true**: adding the git adapter cost an import, an array entry, a workspace dependency and a test alias — no state, no event type, no change to the machine or the renderer. It was false in two places, both about *distribution* rather than the core: `hookConfig` assumes configuration is text you paste, and git's is a script you run. See §17.4.
 
 ### 5.3 Hook registration — the one rule
 

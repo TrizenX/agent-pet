@@ -132,7 +132,7 @@ export function App() {
     text: speechFor(s.state, locale, undefined, s.activity, s.activityLabel, chatty) ?? "…",
     attention: needsAttention(s.state),
   }));
-  const said = lines.map((l) => l.text).join(" | ");
+  const said = lines.map((l) => l.text).join(" | ") || "—";
   useEffect(() => {
     // The spoken line too, not just the state. What the pet *says* is the part
     // a user reports, and this is provably that string rather than a second

@@ -1,0 +1,17 @@
+{
+  "name": "@agent-pet/adapter-git",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./mapping": "./src/mapping.ts",
+    "./install": "./src/install.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agent-pet/protocol": "workspace:*"
+  }
+}

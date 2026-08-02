@@ -205,9 +205,12 @@ describe("celebrationWorthy (D5)", () => {
   });
 
   it("is a pure function of context and a timestamp", () => {
+    // `turnStartedAt: 1` rather than 0. Zero used to stand in for "the turn
+    // began at time zero", which is indistinguishable from "no turn was ever
+    // seen" — and that ambiguity is what made every git commit a trophy.
     const base = {
       lastEventAt: 0,
-      turnStartedAt: 0,
+      turnStartedAt: 1,
       toolsThisTurn: 1,
       hadFailureThisTurn: false,
       hopCount: 0,
@@ -215,8 +218,9 @@ describe("celebrationWorthy (D5)", () => {
       activity: null,
       activityLabel: null,
     };
-    expect(celebrationWorthy(base, 15_000)).toBe(true);
-    expect(celebrationWorthy(base, 14_999)).toBe(false);
+    expect(celebrationWorthy(base, 15_001)).toBe(true);
+    expect(celebrationWorthy(base, 15_000)).toBe(false);
+    expect(celebrationWorthy({ ...base, turnStartedAt: 0 }, 60_000)).toBe(false);
     expect(celebrationWorthy({ ...base, toolsThisTurn: 0 }, 60_000)).toBe(false);
     expect(celebrationWorthy({ ...base, hadFailureThisTurn: true }, 60_000)).toBe(false);
   });
@@ -422,6 +426,30 @@ describe("the activity the pet reports", () => {
 
     expect(toPetState(actor.getSnapshot().value)).toBe("waiting_approval");
     expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
+  });
+});
+
+describe("celebration needs a turn it actually watched", () => {
+  it("does not celebrate a turn that never began", () => {
+    // `turnStartedAt` starts at zero and only `PROMPT_SUBMITTED` moves it, so
+    // an adapter with no notion of a prompt used to satisfy the duration test
+    // with the whole epoch. Every turn was a trophy — found by `git commit`.
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "file_edit", at: 1_700_000_000_000 } as PetMachineEvent);
+    actor.send({ type: "TURN_END", at: 1_700_000_000_100 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("idle");
+    actor.stop();
+  });
+
+  it("still celebrates a turn it did watch", () => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "PROMPT_SUBMITTED", at: 1_000 } as PetMachineEvent);
+    actor.send({ type: "TOOL_START", tool: "bash", at: 2_000 } as PetMachineEvent);
+    actor.send({ type: "TURN_END", at: 60_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("celebrating");
     actor.stop();
   });
 });
