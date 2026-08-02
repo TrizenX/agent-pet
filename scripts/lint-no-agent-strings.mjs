@@ -28,6 +28,14 @@ const ALLOWED = new Set([
   // for tests — the rule already caught an agent name in a machine test
   // comment, which was a real smell.
   "pipeline.test.ts",
+  // Same category, same reason. `App.test.tsx` drives a raw hook payload all
+  // the way to the DOM — that is the point of it, after the joins between
+  // adapter, machine and renderer turned out to be where every bug lived — and
+  // a real payload cannot be written without naming a real hook.
+  //
+  // Whole-file rather than per-string, unlike `packs.rs` below, because the
+  // strings here are the test's subject rather than an incidental path.
+  "App.test.tsx",
 ]);
 
 /**

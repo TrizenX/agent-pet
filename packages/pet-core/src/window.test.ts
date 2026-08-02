@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import config from "../src-tauri/tauri.conf.json";
 import { FRAME_HEIGHT, FRAME_WIDTH } from "./packs/atlas.ts";
@@ -39,5 +40,31 @@ describe("the window fits what it has to draw", () => {
     // 208 px was narrower than "Running pnpm verify", so the bubble was clipped
     // at the window edge and the pet appeared to only ever say "Running…".
     expect(win.width).toBeGreaterThanOrEqual(360);
+  });
+});
+
+describe("the bubble is allowed to use the room it has", () => {
+  const css = readFileSync(new URL("./styles/pet.css", import.meta.url), "utf8");
+  const rule = (selector: string) =>
+    css.slice(css.indexOf(`${selector} {`), css.indexOf("}", css.indexOf(`${selector} {`)));
+
+  /**
+   * Asserted against the stylesheet, not the DOM.
+   *
+   * jsdom does no layout, so a rendering test cannot tell a truncated line from
+   * a whole one — `textContent` is the same either way. Reading the rule is
+   * crude, and it is the only check here that can actually fail.
+   */
+  it("does not cap the project name", () => {
+    // Capped at 38%, "agent-pet" rendered as "agent-p…", which defeats naming
+    // the session at all. If a line has to give, it is the description.
+    expect(rule(".pet-bubble-project")).not.toContain("max-width");
+  });
+
+  it("sizes the bubble to its content before capping it", () => {
+    // With `left: 50%` and `right: auto` the available width is only the half
+    // of the window right of centre, so the bubble shrank to 210px and
+    // ellipsised a line with 412px to live in.
+    expect(rule(".pet-bubble")).toContain("width: max-content");
   });
 });
