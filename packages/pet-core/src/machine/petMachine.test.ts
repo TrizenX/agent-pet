@@ -193,6 +193,7 @@ describe("celebrationWorthy (D5)", () => {
       hadFailureThisTurn: false,
       hopCount: 0,
       blockedReason: null,
+      activity: null,
     };
     expect(celebrationWorthy(base, 15_000)).toBe(true);
     expect(celebrationWorthy(base, 14_999)).toBe(false);
@@ -292,5 +293,55 @@ describe("toPetState", () => {
     expect(toPetState("idle")).toBe("idle");
     expect(toPetState({ working: "digging" })).toBe("working.digging");
     expect(toPetState(undefined)).toBe("idle");
+  });
+});
+
+describe("the activity the pet reports", () => {
+  /**
+   * Every `TOOL_START` branch, including the fallback.
+   *
+   * The fallback shipped without `recordActivity` because it was written on one
+   * line while its three siblings were multi-line, so a mechanical edit matched
+   * them and missed it — the same shape as the `generate_handler!` macro that
+   * lost three commands to a reformat. A table is the fix: a new branch that
+   * forgets to record is a new row that fails.
+   */
+  const CASES: ReadonlyArray<[ToolKind, string]> = [
+    ["bash", "working.digging"],
+    ["file_edit", "working.typing"],
+    ["file_read", "working.reading"],
+    ["search", "working.reading"],
+    ["network", "working.generic"],
+    ["delegate", "working.generic"],
+    ["other", "working.generic"],
+  ];
+
+  it.each(CASES)("records %s and lands in %s", (tool, expected) => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool, at: 1_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe(expected);
+    expect(actor.getSnapshot().context.activity).toBe(tool);
+    actor.stop();
+  });
+
+  it("forgets the tool once it finishes, rather than naming a finished one", () => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "bash", at: 1_000 } as PetMachineEvent);
+    expect(actor.getSnapshot().context.activity).toBe("bash");
+
+    actor.send({ type: "TOOL_DONE", ok: true, tool: "bash", at: 2_000 } as PetMachineEvent);
+    expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
+  });
+
+  it("does not carry an activity out of the work states", () => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "network", at: 1_000 } as PetMachineEvent);
+    actor.send({ type: "APPROVAL_NEEDED", at: 2_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("waiting_approval");
+    expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
   });
 });

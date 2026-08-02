@@ -8,6 +8,7 @@ mod queue;
 mod server;
 mod settings;
 mod tray;
+mod walk;
 mod window;
 
 use std::sync::Arc;
@@ -72,7 +73,8 @@ fn main() {
             gallery::gallery_cache_write,
             gallery::install_pack,
             gallery::select_pack,
-            gallery::uninstall_pack
+            gallery::uninstall_pack,
+            walk::set_walking
         ])
         // `eval` during setup runs against whatever document exists at that
         // moment and is discarded on navigation, so the bridge has to be
@@ -110,6 +112,7 @@ fn main() {
             let shared = std::sync::Arc::new(tray::AppState {
                 settings: std::sync::Mutex::new(saved.clone()),
                 packs: std::sync::Mutex::new(found),
+                walk: std::sync::Mutex::new(walk::Walk::default()),
             });
             app.manage(shared.clone());
 
@@ -313,8 +316,24 @@ fn remember_position(
                 return;
             };
             let _ = win;
+
+            // The window emits `Moved` for the walker's own steps too, so this
+            // would otherwise write settings twelve times a second while the
+            // pet paces, and persist a position it is about to walk away from.
+            let mut walk = shared.walk.lock().expect("walk poisoned");
+            let at = (pos.x, pos.y);
+            if walk.is_driving() {
+                if !walk.is_user_drag(at) {
+                    return;
+                }
+                // A hand on the window outranks the walk. Their spot is home.
+                walk.rehome(at);
+            }
+            let resting = walk.resting_position(at);
+            drop(walk);
+
             let mut settings = shared.settings.lock().expect("settings poisoned");
-            settings.position = Some((pos.x, pos.y));
+            settings.position = Some(resting);
             settings::save(&app, &settings);
         }
     });

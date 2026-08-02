@@ -161,5 +161,6 @@ function toView(session: Session): SessionView {
     lastEventAt: session.lastEventAt,
     ...(session.attentionSince === undefined ? {} : { attentionSince: session.attentionSince }),
     blockedReason: session.actor.getSnapshot().context.blockedReason,
+    activity: session.actor.getSnapshot().context.activity,
   };
 }

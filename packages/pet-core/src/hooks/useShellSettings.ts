@@ -20,6 +20,10 @@ export interface ShellSettings {
   readonly hidden: boolean;
   /** Pack id, or empty for the built-in pet. */
   readonly pack: string;
+  /** Whether the pet paces while the agent works. */
+  readonly wander: boolean;
+  /** "en", "vi", or empty to follow the system. */
+  readonly locale: string;
 }
 
 const DEFAULTS: ShellSettings = {
@@ -28,6 +32,8 @@ const DEFAULTS: ShellSettings = {
   scale: 1,
   hidden: false,
   pack: "",
+  wander: true,
+  locale: "",
 };
 
 /**

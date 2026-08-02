@@ -23,6 +23,15 @@ pub struct Settings {
     pub hidden: bool,
     /// Pack id, or empty for the built-in pet.
     pub pack: String,
+    /// Whether the pet paces while the agent works. On by default; a window
+    /// that moves is a preference, and some people will want it still.
+    pub wander: bool,
+    /// `"en"`, `"vi"`, or empty for "follow the system".
+    ///
+    /// Empty is the default and is not the same as `"en"`: it means nobody has
+    /// chosen, so the webview's own locale decides. Storing a chosen `"en"`
+    /// distinctly is what lets a Vietnamese system be overridden to English.
+    pub locale: String,
 }
 
 impl Default for Settings {
@@ -34,6 +43,8 @@ impl Default for Settings {
             scale: 1.0,
             hidden: false,
             pack: String::new(),
+            wander: true,
+            locale: String::new(),
         }
     }
 }

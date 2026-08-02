@@ -10,6 +10,7 @@
  * a registry, actors or a clock.
  */
 
+import type { ToolKind } from "@agent-pet/protocol";
 import type { PetState } from "../packs/stateMap.ts";
 
 /** States in which the pet is asking the user for something. */
@@ -32,6 +33,8 @@ export interface SessionView {
   /** When this session entered its current attention state, if it is in one. */
   readonly attentionSince?: number;
   readonly blockedReason: string | null;
+  /** The kind of work in flight, when there is any. Drives the bubble. */
+  readonly activity: ToolKind | null;
 }
 
 /**
