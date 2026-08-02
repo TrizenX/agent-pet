@@ -1,14 +1,15 @@
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { copyHookConfig } from "./adapters/hookConfig.ts";
 import { EventLog } from "./components/EventLog.tsx";
+import { PackPicker } from "./components/PackPicker.tsx";
 import { Pet } from "./components/Pet.tsx";
 import { SessionBadge } from "./components/SessionBadge.tsx";
 import { SpeechBubble } from "./components/SpeechBubble.tsx";
 import { StateGlyph } from "./components/StateGlyph.tsx";
 import { listenForScenarios } from "./demo/runner.ts";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
-import { useShellSettings } from "./hooks/useShellSettings.ts";
+import { selectPack, useShellSettings } from "./hooks/useShellSettings.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
 import { loadInstalledPacks } from "./packs/discovery.ts";
 import type { LoadedPack } from "./packs/loader.ts";
@@ -39,6 +40,7 @@ export function App() {
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const { snapshot, log } = useAgentEvents();
   const [logOpen, setLogOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const shell = useShellSettings();
 
@@ -58,25 +60,37 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const unlisten = listen("open-gallery", () => setPickerOpen(true));
+    return () => {
+      void unlisten.then((off) => off()).catch(() => {});
+    };
+  }, []);
+
   const [installed, setInstalled] = useState<readonly LoadedPack[]>([]);
+
+  // Re-read the disk. Called at mount, and again after an install so a pack the
+  // user just downloaded is usable now rather than after a restart.
+  const rescanPacks = useCallback(async (live: () => boolean) => {
+    const { packs, rejected } = await loadInstalledPacks();
+    if (!live()) return;
+    setInstalled(packs);
+    // A broken pack costs a log line, not the pet (I4). Named, so the user can
+    // tell which of their packs is the problem.
+    console.log(`[packs] ${packs.length} loaded, ${rejected.length} skipped`);
+    for (const r of rejected) console.warn(`[packs] skipped ${r.id}: ${r.reason}`);
+  }, []);
 
   useEffect(() => {
     let live = true;
     void loadDefaultPack().then((p) => {
       if (live) setPack(p);
     });
-    void loadInstalledPacks().then(({ packs, rejected }) => {
-      if (!live) return;
-      setInstalled(packs);
-      // A broken pack costs a log line, not the pet (I4). Named, so the user
-      // can tell which of their packs is the problem.
-      console.log(`[packs] ${packs.length} loaded, ${rejected.length} skipped`);
-      for (const r of rejected) console.warn(`[packs] skipped ${r.id}: ${r.reason}`);
-    });
+    void rescanPacks(() => live);
     return () => {
       live = false;
     };
-  }, []);
+  }, [rescanPacks]);
 
   const state = snapshot.focused?.state ?? "sleeping";
 
@@ -119,6 +133,16 @@ export function App() {
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
       <Pet pack={active} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
       <EventLog entries={log} open={logOpen} onClose={() => setLogOpen(false)} />
+      <PackPicker
+        open={pickerOpen}
+        installedIds={installed.map((p) => p.id)}
+        onClose={() => setPickerOpen(false)}
+        onInstalled={(slug) => {
+          // Load it, then wear it. Installing a pet you then have to go and
+          // select is two steps where the user asked for one.
+          void rescanPacks(() => true).then(() => selectPack(slug));
+        }}
+      />
     </div>
   );
 }

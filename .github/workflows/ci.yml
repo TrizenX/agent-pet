@@ -52,8 +52,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/pet-core/src-tauri
+      # `tauri-build` reads frontendDist at compile time and fails if it is
+      # missing, but `cargo test` needs no real frontend. This was a stale Vite
+      # build committed to the repo, which satisfied the check by accident and
+      # showed up as a modified file after every local build. Generated here
+      # instead, so nothing under dist/ is tracked.
       - name: Placeholder frontend for tauri-build
-        run: test -f packages/pet-core/dist/index.html
+        run: |
+          mkdir -p packages/pet-core/dist
+          printf '<!doctype html><title>placeholder</title>' > packages/pet-core/dist/index.html
       - run: cargo fmt --manifest-path packages/pet-core/src-tauri/Cargo.toml -- --check
       # I1 and I2 are enforced by these tests; they are not optional.
       - run: cargo test --manifest-path packages/pet-core/src-tauri/Cargo.toml

@@ -29,6 +29,21 @@ const DEFAULTS: ShellSettings = {
   pack: "",
 };
 
+/**
+ * Ask the shell to wear a different pack.
+ *
+ * Not `setState` here: the shell persists the choice and the tray writes the
+ * same field, so the frontend asks rather than decides. The answer arrives back
+ * through `pet-settings`, the same path a tray click takes.
+ */
+export async function selectPack(slug: string): Promise<void> {
+  try {
+    await invoke("select_pack", { slug });
+  } catch (e) {
+    console.warn(`[packs] could not select ${slug}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 export function useShellSettings(): ShellSettings {
   const [settings, setSettings] = useState<ShellSettings>(DEFAULTS);
 
