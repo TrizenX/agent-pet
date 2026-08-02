@@ -158,3 +158,52 @@ describe("schema drift — findings from the recording", () => {
     }
   });
 });
+
+/**
+ * Which hooks have no recorded evidence at all.
+ *
+ * Every test above iterates over the fixtures that exist, so a hook with no
+ * fixture is not tested — it is *invisible*. The suite has been green this
+ * whole time while five of the sixteen hooks in `EXPECTED` had never been seen
+ * coming out of a real agent. Their mappings are written from documentation
+ * and checked against payloads we composed ourselves, which is the situation
+ * §11.1 says recording exists to end.
+ *
+ * A test that simply demanded a fixture for every hook would be red today and
+ * would be deleted by the third person who hit it. So the gap is written down
+ * instead, with the reason each one is missing. That makes two things fail
+ * that used to pass silently: adding a hook to the mapping without either a
+ * fixture or an explicit admission, and — the one that matters — *recording a
+ * fixture and forgetting to take it off this list*.
+ */
+describe("hooks with no recorded fixture", () => {
+  const recorded = new Set(files.map((f) => f.replace(/-\d+\.json$/, "")));
+
+  /** hook -> why it has never been captured. Delete the entry with the fixture. */
+  const UNCAPTURED: Record<string, string> = {
+    SessionStart: "never observed in a headless run; needs an interactive session",
+    PermissionDenied: "requires a human declining a permission prompt",
+    StopFailure:
+      "requires a turn that fails against the API. Manufactured with a local " +
+      "endpoint returning 429 via ANTHROPIC_BASE_URL and it still did not fire " +
+      "headless — see artifacts/real-session/FINDINGS.md",
+    Elicitation: "requires an MCP server that elicits input mid-turn",
+    ElicitationResult: "same, plus a reply to it",
+  };
+
+  it("is exactly the list we think it is", () => {
+    const missing = Object.keys(EXPECTED)
+      .filter((hook) => !recorded.has(hook))
+      .sort();
+    expect(missing).toEqual(Object.keys(UNCAPTURED).sort());
+  });
+
+  it("every admission names a hook the mapping actually handles", () => {
+    // Otherwise the list rots into an excuse for hooks that no longer exist.
+    for (const hook of Object.keys(UNCAPTURED)) {
+      expect(EXPECTED, `${hook} is admitted as uncaptured but is not in EXPECTED`).toHaveProperty(
+        hook,
+      );
+    }
+  });
+});

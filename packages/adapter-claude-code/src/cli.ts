@@ -160,6 +160,13 @@ function cmdRecord(argv: readonly string[]): number {
   const outDir = resolve(flag(argv, "out") ?? "test/fixtures");
   const install = argv.includes("--install");
   const redactPayloads = !argv.includes("--no-redact");
+  const only = new Set(
+    (flag(argv, "only") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const force = argv.includes("--force");
 
   if (install) {
     const { backup } = installHooks(hooksFor(port), port);
@@ -167,7 +174,7 @@ function cmdRecord(argv: readonly string[]): number {
     console.log("[record] they will be removed on exit\n");
   }
 
-  const server = startRecorder({ port, outDir, redactPayloads, verbose: true });
+  const server = startRecorder({ port, outDir, redactPayloads, verbose: true, only, force });
 
   const shutdown = () => {
     server.close();
@@ -197,7 +204,11 @@ export function main(argv: readonly string[]): number | Promise<number> {
       return cmdRecord(argv);
     default:
       console.error(`usage: pet-adapter <${COMMANDS.join("|")}> [--port N] [--out DIR]`);
-      console.error("       pet-adapter record --install   # temporary hooks, removed on exit");
+      console.error(
+        "       pet-adapter record --install          # temporary hooks, removed on exit",
+      );
+      console.error("       pet-adapter record --only A,B         # capture only these hooks");
+      console.error("       pet-adapter record --force            # replace fixtures that exist");
       return 1;
   }
 }

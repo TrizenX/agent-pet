@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { join } from "node:path";
 
@@ -71,6 +71,43 @@ interface RecorderOptions {
   readonly outDir: string;
   readonly redactPayloads: boolean;
   readonly verbose: boolean;
+  /** Capture only these hooks. Empty means all of them. */
+  readonly only?: ReadonlySet<string>;
+  /** Overwrite fixtures that already exist. Off by default. */
+  readonly force?: boolean;
+}
+
+/**
+ * Whether this payload should be written, and why not if not.
+ *
+ * Split out from the request handler because it is the part with rules, and
+ * the rules exist for reasons that are easy to forget:
+ *
+ * `only` is what makes a capture run safe to leave running for an afternoon.
+ * Twelve of the sixteen hooks already have curated fixtures; the four or five
+ * that do not are the ones worth waiting for, and without a filter every
+ * `PreToolUse` in the session competes for the same three slots.
+ *
+ * `force` guards the thing that has no undo. Fixtures are written as
+ * `<Name>-<n>.json` into a directory that is usually `test/fixtures`, so a
+ * default run silently overwrites files that were captured, redacted and
+ * reviewed months ago — and the diff would be buried under whatever else the
+ * session produced. Re-recording before a release is a stated purpose (§11.1),
+ * so it stays possible; it just stops being the accident.
+ */
+export function shouldWrite(
+  name: string,
+  n: number,
+  exists: boolean,
+  opts: Pick<RecorderOptions, "only" | "force">,
+): { write: boolean; reason?: string } {
+  if (opts.only?.size && !opts.only.has(name)) {
+    return { write: false, reason: "not in --only" };
+  }
+  if (n > MAX_PER_EVENT) return { write: false, reason: `have ${MAX_PER_EVENT}` };
+  if (exists && !opts.force)
+    return { write: false, reason: "already recorded, --force to replace" };
+  return { write: true };
 }
 
 export function startRecorder(opts: RecorderOptions): { close: () => void } {
@@ -110,13 +147,15 @@ export function startRecorder(opts: RecorderOptions): { close: () => void } {
       const name = typeof event === "string" ? event : "Unknown";
       const n = (counts.get(name) ?? 0) + 1;
       counts.set(name, n);
-      if (n > MAX_PER_EVENT) {
-        if (opts.verbose) console.log(`[record] ${name} #${n} (skipped, have ${MAX_PER_EVENT})`);
+
+      const file = join(opts.outDir, `${name}-${n}.json`);
+      const verdict = shouldWrite(name, n, existsSync(file), opts);
+      if (!verdict.write) {
+        if (opts.verbose) console.log(`[record] ${name} #${n} (skipped: ${verdict.reason})`);
         return;
       }
 
       const body = opts.redactPayloads ? redact(payload) : payload;
-      const file = join(opts.outDir, `${name}-${n}.json`);
       writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`);
       console.log(`[record] ${name} #${n} -> ${file}`);
     });
@@ -130,6 +169,14 @@ export function startRecorder(opts: RecorderOptions): { close: () => void } {
         ? "[record] redaction ON — keys preserved, free-text values replaced"
         : "[record] redaction OFF — do not commit these files",
     );
+    // What it is waiting for, not just that it is waiting. A capture run can
+    // sit for an hour and produce nothing, and "nothing happened" and "I was
+    // filtering out everything" look identical from the outside.
+    if (opts.only?.size) {
+      console.log(`[record] waiting for: ${[...opts.only].sort().join(", ")}`);
+      console.log("[record] everything else is answered 204 and dropped");
+    }
+    if (!opts.force) console.log("[record] existing fixtures are kept (--force to replace)");
     console.log("\nRun an agent session, then stop with ctrl-c.\n");
   });
 
