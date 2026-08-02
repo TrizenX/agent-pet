@@ -243,6 +243,14 @@ describe("what the pet says the agent is doing", () => {
     ["export A=1; cargo test --all", "cargo test"],
     ["grep -rn TODO src/", "grep TODO src/"],
     ["git status", "git status"],
+    // A heredoc used to report its own terminator, because the last line of a
+    // multi-line command is the least interesting thing in it.
+    ["python3 - <<'PY'\nimport json\nPY", "python3 <<'PY'"],
+    // Dropping a flag but keeping its value left a tail of orphaned arguments:
+    // "gh pr view 32 TrizenX/agent-pet statusCheckRollup". Four words is where
+    // subcommands stop, and it was already the whole answer.
+    ["gh pr view 32 --repo TrizenX/agent-pet --json statusCheckRollup", "gh pr view 32"],
+    ["docker compose up -d --build", "docker compose up"],
   ])("strips the plumbing off %s", (command, want) => {
     // The last segment does the work, and flags are dropped from it. Reducing
     // to the program name turned `grep -rn TODO src/` into "grep", which

@@ -81,6 +81,12 @@ body {
      renderer, so the gap stays 6px at every size. */
   bottom: calc(var(--pet-h, 208px) + 6px);
   left: 50%;
+  /* Size to the content first, then cap.
+     With `left: 50%` and `right: auto` the available width is only the half of
+     the window to the right of centre, so the bubble was shrinking to 210px and
+     ellipsising a line that had 412px to live in — `max-width` never got a say.
+     `max-content` sizes it to the text, and the cap then applies to that. */
+  width: max-content;
   transform: translateX(-50%);
   /* The window is deliberately much wider than the pet so this has room. It
      was 208px — narrower than "Running pnpm verify" — and the bubble was
@@ -121,26 +127,19 @@ body {
   font-weight: 600;
 }
 
+/* A session that has been quiet for a minute and a half is still listed, but it
+   should not read as loudly as one doing work right now. */
+.pet-bubble-line[data-quiet] {
+  opacity: 0.5;
+}
+
+/* The project name is shown in full.
+   It used to be capped at 38% and ellipsised, so "agent-pet" read as
+   "agent-p…" — which defeats the point of naming the session at all. If a line
+   has to give, it is the description: that one still truncates. */
 .pet-bubble-project {
   flex: none;
   opacity: 0.62;
-  max-width: 38%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pet-badge {
-  position: absolute;
-  bottom: calc(var(--pet-h, 208px) - 30px);
-  left: calc(50% - var(--pet-w, 192px) / 2 - 10px);
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  color: #fff;
-  background: rgb(124 92 255 / 0.92);
 }
 
 @media (prefers-reduced-motion: reduce) {
