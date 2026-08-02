@@ -1,0 +1,82 @@
+[
+  {
+    "name": "an idle pet costs approximately nothing",
+    "invariant": "I6",
+    "passed": true,
+    "detail": "0.083 % of one core over 60 s (after 15 s settling), RSS 362 -> 363 MB",
+    "data": {
+      "cpu_percent": 0.0833,
+      "rss_start_mb": 362,
+      "rss_end_mb": 363
+    }
+  },
+  {
+    "name": "every hook response is 204 with an empty body",
+    "invariant": "I1",
+    "passed": true,
+    "detail": "all inputs answered 204/0 bytes",
+    "data": {
+      "cases": 8
+    }
+  },
+  {
+    "name": "browser-originated requests are refused",
+    "invariant": "\u00a710",
+    "passed": true,
+    "detail": "origin=403, sec-fetch-site=403, sec-fetch-mode=403",
+    "data": {}
+  },
+  {
+    "name": "a hook round-trip costs well under a millisecond",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "median 0.134 ms, p99 0.389 ms over 200/200 requests",
+    "data": {
+      "median_ms": 0.1335,
+      "p99_ms": 0.3894,
+      "n": 200,
+      "requested": 200
+    }
+  },
+  {
+    "name": "an approval outranks a more recently active session",
+    "invariant": "\u00a78",
+    "passed": false,
+    "detail": "2 -> 3 sessions; focus is working.digging on other-repo \u2014 the two new sessions were not created",
+    "data": {
+      "before": 2,
+      "after": 3,
+      "state": "working.digging",
+      "project": "other-repo",
+      "since": 1785671898691
+    }
+  },
+  {
+    "name": "memory stays flat over a long run",
+    "invariant": "M2 soak",
+    "passed": false,
+    "detail": "the pet stopped answering after 20 s of 480.0 min (4 sessions in): TimeoutError timed out",
+    "data": {
+      "seconds_survived": 20.1,
+      "sessions": 4
+    }
+  },
+  {
+    "name": "a stopped pet costs the agent nothing",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "0.081 ms per refused connection",
+    "data": {
+      "per_request_ms": 0.0806
+    }
+  },
+  {
+    "name": "a hung pet still bounds the agent's wait",
+    "invariant": "I2",
+    "passed": true,
+    "detail": "no response for 2502 ms (our 2.5 s client timeout; the hook's own 2 s would fire sooner)",
+    "data": {
+      "waited_ms": 2502
+    }
+  }
+]

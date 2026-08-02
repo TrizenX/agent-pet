@@ -92,8 +92,28 @@ mod macos {
     /// instance variables; it only changes behaviour. The style mask bit is
     /// meaningless on a plain NSWindow, which is why the class has to change
     /// first.
+    /// Re-class once, and only once.
+    ///
+    /// `apply` runs on every `show()`, which means startup, the tray's Show
+    /// toggle, and — the one that hurt — the single-instance callback when
+    /// someone launches the app a second time. Re-classing a window that is
+    /// already an `NSPanel` and setting `floatingPanel` again crashes inside
+    /// AppKit's window manager:
+    ///
+    ///     -[NSPanel setFloatingPanel:]
+    ///     -[NSWindow _applyWindowLevelWithTagUpdateNeeded:]
+    ///     -[_WMWindow setWindowLevel:]                      EXC_BREAKPOINT
+    ///
+    /// So double-clicking the app icon while it was running killed the pet that
+    /// was already there. Found by a soak that died twenty seconds in, from a
+    /// crash report rather than from any test.
     unsafe fn make_nonactivating_panel(ns_window: *mut Object) {
         use objc::runtime::{NO, YES};
+
+        let already: bool = msg_send![ns_window, isKindOfClass: class!(NSPanel)];
+        if already {
+            return;
+        }
 
         object_setClass(ns_window, class!(NSPanel));
 
@@ -179,6 +199,18 @@ mod macos {
     /// invariant I6 the way a polling timer would.
     fn observe_space_changes(ns_window_addr: usize, behaviour: u64, level: i64) {
         use block::ConcreteBlock;
+        use std::sync::Once;
+
+        // One observer for the life of the process. Registering per `show()`
+        // piled up a handler for every time the pet had ever been shown, each
+        // re-asserting the level on every Space change — work that grew for as
+        // long as the app ran, in the one place I6 promises nothing does.
+        static REGISTERED: Once = Once::new();
+        let mut registered = false;
+        REGISTERED.call_once(|| registered = true);
+        if !registered {
+            return;
+        }
 
         unsafe {
             let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
