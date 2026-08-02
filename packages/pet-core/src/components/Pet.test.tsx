@@ -6,7 +6,6 @@ import { buildPack, type LoadedPack } from "../packs/loader.ts";
 import type { PetState } from "../packs/stateMap.ts";
 import { speechFor } from "../packs/strings.ts";
 import { Pet } from "./Pet.tsx";
-import { SessionBadge } from "./SessionBadge.tsx";
 import { SpeechBubble, type SpeechLine } from "./SpeechBubble.tsx";
 import { StateGlyph } from "./StateGlyph.tsx";
 
@@ -242,15 +241,5 @@ describe("SpeechBubble", () => {
   it("omits the project name when there is only one line to tell apart", () => {
     render(<SpeechBubble lines={[line("a", "Running pnpm test", { project: "agent-pet" })]} />);
     expect(screen.queryByText("agent-pet")).toBeNull();
-  });
-});
-
-describe("SessionBadge", () => {
-  it("appears only past one session", () => {
-    const { unmount } = render(<SessionBadge count={1} />);
-    expect(document.querySelector(".pet-badge")).toBeNull();
-    unmount();
-    render(<SessionBadge count={4} />);
-    expect(screen.getByText("4")).toBeTruthy();
   });
 });

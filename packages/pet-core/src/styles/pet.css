@@ -121,26 +121,13 @@ body {
   font-weight: 600;
 }
 
+/* The project name is shown in full.
+   It used to be capped at 38% and ellipsised, so "agent-pet" read as
+   "agent-p…" — which defeats the point of naming the session at all. If a line
+   has to give, it is the description: that one still truncates. */
 .pet-bubble-project {
   flex: none;
   opacity: 0.62;
-  max-width: 38%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pet-badge {
-  position: absolute;
-  bottom: calc(var(--pet-h, 208px) - 30px);
-  left: calc(50% - var(--pet-w, 192px) / 2 - 10px);
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  color: #fff;
-  background: rgb(124 92 255 / 0.92);
 }
 
 @media (prefers-reduced-motion: reduce) {

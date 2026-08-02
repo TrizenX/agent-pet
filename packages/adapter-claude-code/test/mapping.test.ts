@@ -243,6 +243,9 @@ describe("what the pet says the agent is doing", () => {
     ["export A=1; cargo test --all", "cargo test"],
     ["grep -rn TODO src/", "grep TODO src/"],
     ["git status", "git status"],
+    // A heredoc used to report its own terminator, because the last line of a
+    // multi-line command is the least interesting thing in it.
+    ["python3 - <<'PY'\nimport json\nPY", "python3 <<'PY'"],
   ])("strips the plumbing off %s", (command, want) => {
     // The last segment does the work, and flags are dropped from it. Reducing
     // to the program name turned `grep -rn TODO src/` into "grep", which

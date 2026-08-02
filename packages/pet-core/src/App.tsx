@@ -4,7 +4,6 @@ import { copyHookConfig } from "./adapters/hookConfig.ts";
 import { EventLog } from "./components/EventLog.tsx";
 import { PackPicker } from "./components/PackPicker.tsx";
 import { Pet } from "./components/Pet.tsx";
-import { SessionBadge } from "./components/SessionBadge.tsx";
 import { SpeechBubble } from "./components/SpeechBubble.tsx";
 import { StateGlyph } from "./components/StateGlyph.tsx";
 import { listenForScenarios } from "./demo/runner.ts";
@@ -156,7 +155,6 @@ export function App() {
   return (
     <div className="pet-root">
       <SpeechBubble lines={lines} />
-      <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
       <Pet
         pack={active}

@@ -102,12 +102,16 @@ function host(value: unknown): string | undefined {
 function commandName(command: unknown): string | undefined {
   if (typeof command !== "string") return undefined;
   const segments = command
-    .split(/&&|\|\||;|\n/)
+    .split(/&&|\|\||;/)
     .map((c) => c.trim())
     .filter(Boolean)
     .filter((c) => !/^(cd|export|source|set)\s|^[A-Z_]+=/.test(c));
 
-  const last = segments.at(-1) ?? command;
+  // The first *line* of the last segment. Splitting on newlines too made a
+  // heredoc report its terminator: `python3 - <<'PY' … PY` came out as "PY",
+  // because the last line of a multi-line command is the least interesting
+  // thing in it.
+  const last = (segments.at(-1) ?? command).split("\n")[0] ?? "";
   // Flags are noise competing for a narrow bubble: `grep -n -B3 -A22 "def x"`
   // spends most of its width saying nothing, and truncation then eats the
   // pattern — the one part worth reading. Dropping them keeps the program and
