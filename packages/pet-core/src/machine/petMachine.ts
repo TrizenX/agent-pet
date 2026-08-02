@@ -19,7 +19,7 @@
  * timer-free.
  */
 
-import type { PetEvent } from "@agent-pet/protocol";
+import type { PetEvent, ToolKind } from "@agent-pet/protocol";
 import { assign, setup } from "xstate";
 import type { PetState } from "../packs/stateMap.ts";
 
@@ -46,6 +46,14 @@ export interface PetContext {
   hopCount: number;
   /** Why the agent is stuck, when it is. */
   blockedReason: string | null;
+  /**
+   * What kind of work is in flight, so the pet can say so.
+   *
+   * The `ToolKind` from the wire, never the adapter's `label`. `label` would
+   * carry agent-specific text into pet-core at runtime, where the I5 lint
+   * cannot see it — the rule would still be enforced and still be broken.
+   */
+  activity: ToolKind | null;
 }
 
 export const DELAYS = {
@@ -85,6 +93,7 @@ const initialContext: PetContext = {
   hadFailureThisTurn: false,
   hopCount: 0,
   blockedReason: null,
+  activity: null,
 };
 
 export function celebrationWorthy(ctx: PetContext, at: number): boolean {
@@ -103,6 +112,7 @@ export const petMachine = setup({
   guards: {
     isBash: ({ event }) => event.type === "TOOL_START" && event.tool === "bash",
     isFileEdit: ({ event }) => event.type === "TOOL_START" && event.tool === "file_edit",
+    isDelegate: ({ event }) => event.type === "TOOL_START" && event.tool === "delegate",
     isReading: ({ event }) =>
       event.type === "TOOL_START" && (event.tool === "file_read" || event.tool === "search"),
 
@@ -142,6 +152,15 @@ export const petMachine = setup({
       blockedReason: ({ event }) => (event.type === "AGENT_BLOCKED" ? event.reason : null),
     }),
     clearBlock: assign({ blockedReason: null }),
+    recordActivity: assign({
+      activity: ({ event }) => (event.type === "TOOL_START" ? event.tool : null),
+    }),
+    /**
+     * Cleared when the work ends rather than when the next starts. A pet that
+     * keeps saying "Running…" after the command finished is worse than one that
+     * says nothing: the first is wrong, the second is merely quiet.
+     */
+    clearActivity: assign({ activity: null }),
   },
   delays: DELAYS,
 }).createMachine({
@@ -157,38 +176,66 @@ export const petMachine = setup({
   on: {
     "*": { actions: "touch" },
 
-    SESSION_START: { target: ".idle", actions: ["touch", "clearBlock"] },
-    SESSION_END: { target: ".sleeping", actions: "touch" },
-    AGENT_IDLE: { target: ".idle", actions: "touch" },
-    PROMPT_SUBMITTED: { target: ".attentive", actions: ["touch", "startTurn", "clearBlock"] },
-    APPROVAL_NEEDED: { target: ".waiting_approval", actions: "touch" },
-    AGENT_BLOCKED: { target: ".exhausted", actions: ["touch", "recordBlock"] },
+    SESSION_START: { target: ".idle", actions: ["touch", "clearBlock", "clearActivity"] },
+    SESSION_END: { target: ".sleeping", actions: ["touch", "clearActivity"] },
+    AGENT_IDLE: { target: ".idle", actions: ["touch", "clearActivity"] },
+    PROMPT_SUBMITTED: {
+      target: ".attentive",
+      actions: ["touch", "startTurn", "clearBlock", "clearActivity"],
+    },
+    // Clears the activity too. The bubble would not show it here anyway —
+    // an approval outranks the tool that triggered it — but holding the rule
+    // in the context rather than only in the view means there is one place it
+    // can be wrong instead of two.
+    APPROVAL_NEEDED: { target: ".waiting_approval", actions: ["touch", "clearActivity"] },
+    AGENT_BLOCKED: { target: ".exhausted", actions: ["touch", "recordBlock", "clearActivity"] },
+    INPUT_NEEDED: { target: ".waiting_input", actions: ["touch", "clearActivity"] },
+    COMPACTING: { target: ".compacting", actions: ["touch", "clearActivity"] },
+    /**
+     * The delegated agent came back. There is no start hook to pair with, so
+     * this can arrive in any state — landing in `working.generic` is right for
+     * the case it was sent for and harmless everywhere else, because whatever
+     * the agent does next sends its own event.
+     */
+    SUBAGENT_END: { target: ".working.generic", actions: ["touch", "clearActivity"] },
 
     TOOL_START: [
       {
         guard: "isBash",
         target: ".working.digging",
-        actions: ["touch", "countTool", "clearBlock"],
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
       },
       {
         guard: "isFileEdit",
         target: ".working.typing",
-        actions: ["touch", "countTool", "clearBlock"],
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
+      },
+      {
+        guard: "isDelegate",
+        target: ".working.delegating",
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
       },
       {
         guard: "isReading",
         target: ".working.reading",
-        actions: ["touch", "countTool", "clearBlock"],
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
       },
-      { target: ".working.generic", actions: ["touch", "countTool", "clearBlock"] },
+      {
+        target: ".working.generic",
+        actions: ["touch", "countTool", "clearBlock", "recordActivity"],
+      },
     ],
 
     TURN_END: [
-      { guard: "worthCelebrating", target: ".celebrating", actions: "touch" },
-      { target: ".idle", actions: "touch" },
+      {
+        guard: "worthCelebrating",
+        target: ".celebrating",
+        actions: ["touch", "clearActivity"],
+      },
+      { target: ".idle", actions: ["touch", "clearActivity"] },
     ],
 
-    WATCHDOG: { guard: "isStale", target: ".sleeping", actions: "touch" },
+    WATCHDOG: { guard: "isStale", target: ".sleeping", actions: ["touch", "clearActivity"] },
   },
 
   states: {
@@ -213,21 +260,51 @@ export const petMachine = setup({
       after: { ACTIVITY_DECAY: "idle" },
       on: {
         TOOL_DONE: [
-          { guard: "toolFailed", target: "#pet.error", actions: ["touch", "noteFailure"] },
+          {
+            guard: "toolFailed",
+            target: "#pet.error",
+            actions: ["touch", "noteFailure", "clearActivity"],
+          },
           // A cancelled command is not a failure to show. The agent has stopped
           // either way, so idle is the honest state.
-          { guard: "toolInterrupted", target: "#pet.idle", actions: "touch" },
+          { guard: "toolInterrupted", target: "#pet.idle", actions: ["touch", "clearActivity"] },
           // Success: stay put and let the renderer play a one-shot hop, so a
           // long sequence of tool calls reads as continuous work.
-          { actions: ["touch", "hop"] },
+          //
+          // The activity clears even though the state does not. Between two
+          // tool calls the agent is working but not running anything, and the
+          // pet falling back to a general word is honest where naming the
+          // command that already finished would not be.
+          { actions: ["touch", "hop", "clearActivity"] },
         ],
       },
       states: {
         digging: {},
         typing: {},
         reading: {},
+        delegating: {},
         generic: {},
       },
+    },
+
+    /**
+     * The agent asked a question. An attention state, so the watchdog leaves it
+     * alone for the same reason it leaves an approval alone — silence here
+     * means the user stepped away, which is when the question most needs to
+     * still be on screen.
+     */
+    waiting_input: {
+      on: { WATCHDOG: {} },
+      after: { APPROVAL_DECAY: "idle" },
+    },
+
+    /**
+     * Compaction. Bounded by the same generous decay as the other busy states:
+     * it can legitimately take a while, and the decay is there to catch a hook
+     * that never arrived rather than to interrupt real work.
+     */
+    compacting: {
+      after: { ACTIVITY_DECAY: "idle" },
     },
 
     waiting_approval: {

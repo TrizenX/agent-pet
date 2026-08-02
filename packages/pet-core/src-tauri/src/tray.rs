@@ -28,6 +28,8 @@ pub struct AppState {
     /// freshly installed pack stayed invisible until the next launch — the
     /// startup cache is right for startup and wrong the moment we can write.
     pub packs: Mutex<Vec<crate::packs::DiscoveredPack>>,
+    /// Where the pet is in its pacing, and where home is. See `walk.rs`.
+    pub walk: Mutex<crate::walk::Walk>,
 }
 
 /// Scales offered in the Size submenu. Anything else is a data change.
@@ -52,6 +54,14 @@ pub fn build(
         "Click-through (pet not draggable)",
         true,
         initial.click_through,
+        None::<&str>,
+    )?;
+    let wander = CheckMenuItem::with_id(
+        app,
+        "wander",
+        "Pace while working",
+        true,
+        initial.wander,
         None::<&str>,
     )?;
     let glyphs = CheckMenuItem::with_id(
@@ -123,6 +133,34 @@ pub fn build(
             Err(e) => println!("[packs] no menu item for {}: {e}", found.id),
         }
     }
+    let languages = [
+        ("lang:", "Follow system"),
+        ("lang:en", "English"),
+        ("lang:vi", "Tiếng Việt"),
+    ]
+    .iter()
+    .map(|(id, label)| {
+        CheckMenuItem::with_id(
+            app,
+            *id,
+            *label,
+            true,
+            initial.locale == id[5..],
+            None::<&str>,
+        )
+    })
+    .collect::<tauri::Result<Vec<_>>>()?;
+    let language = Submenu::with_id_and_items(
+        app,
+        "language",
+        "Language",
+        true,
+        &languages
+            .iter()
+            .map(|i| i as &dyn tauri::menu::IsMenuItem<_>)
+            .collect::<Vec<_>>(),
+    )?;
+
     // Last in the submenu, and the only item there that touches the network.
     // §12.4: nothing is fetched until someone opens this.
     let more = MenuItem::with_id(
@@ -178,7 +216,9 @@ pub fn build(
         &[
             &show,
             &click_through,
+            &wander,
             &glyphs,
+            &language,
             &choose_pet,
             &size,
             &demo,
@@ -236,6 +276,22 @@ fn on_menu(app: &AppHandle, id: &str) {
             if let Some(win) = pet(app) {
                 window::set_click_through(&win, settings.click_through);
             }
+        }
+
+        other if other.starts_with("lang:") => {
+            settings.locale = other.trim_start_matches("lang:").to_string();
+            let _ = app.emit("pet-settings", &settings);
+        }
+
+        "wander" => {
+            settings.wander = !settings.wander;
+            // Off means off immediately, including mid-stride. Walking politely
+            // home after the user has just said "stop moving" is not what they
+            // asked for.
+            if !settings.wander {
+                crate::walk::halt(app);
+            }
+            let _ = app.emit("pet-settings", &settings);
         }
 
         "glyphs" => {

@@ -20,6 +20,8 @@ export interface PetProps {
   readonly state: PetState;
   readonly scale: number;
   readonly reducedMotion: boolean;
+  /** -1 walking left, 1 walking right, 0 standing still. */
+  readonly facing?: number;
 }
 
 /**
@@ -39,9 +41,18 @@ function useStepKeyframes(frameWidthPx: number): void {
   }, [frameWidthPx]);
 }
 
-export function Pet({ pack, state, scale, reducedMotion }: PetProps) {
+export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps) {
   const anim = STATE_ANIMATIONS[state];
-  const resolved = useMemo(() => resolveRow(pack, anim.row), [pack, anim.row]);
+  /**
+   * Walking left is a different row, not a mirrored one — when the pack drew
+   * it. `resolveRow` already falls back to mirroring row 1 for packs that left
+   * row 2 empty, which is most of the reason row 2 was worth using at all.
+   *
+   * Only while genuinely moving. A pet that is standing still should face
+   * whichever way its idle art faces.
+   */
+  const row = facing < 0 && anim.row === "running-right" ? "running-left" : anim.row;
+  const resolved = useMemo(() => resolveRow(pack, row), [pack, row]);
 
   const fw = FRAME_WIDTH * scale;
   const fh = FRAME_HEIGHT * scale;

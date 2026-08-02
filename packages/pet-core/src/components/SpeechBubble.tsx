@@ -1,3 +1,4 @@
+import type { ToolKind } from "@agent-pet/protocol";
 import type { PetState } from "../packs/stateMap.ts";
 import { type Locale, speechFor } from "../packs/strings.ts";
 
@@ -13,13 +14,16 @@ export function SpeechBubble({
   project,
   locale = "en",
   overrides,
+  activity,
 }: {
   readonly state: PetState;
   readonly project?: string | undefined;
   readonly locale?: Locale;
   readonly overrides?: Partial<Record<PetState, string>>;
+  /** The kind of work in flight, when there is any. Refines the state word. */
+  readonly activity?: ToolKind | null;
 }) {
-  const text = speechFor(state, locale, overrides);
+  const text = speechFor(state, locale, overrides, activity);
   if (!text) return null;
   return (
     <div className="pet-bubble" role="status">

@@ -50,6 +50,9 @@ const ROUTES: ReadonlyArray<[PetState, PetMachineEvent[]]> = [
   ["working.typing", [start(), tool("file_edit")]],
   ["working.reading", [start(), tool("file_read")]],
   ["working.generic", [start(), tool("other")]],
+  ["working.delegating", [start(), tool("delegate")]],
+  ["compacting", [start(), ev({ type: "COMPACTING" })]],
+  ["waiting_input", [start(), ev({ type: "INPUT_NEEDED" })]],
   ["waiting_approval", [start(), ev({ type: "APPROVAL_NEEDED" })]],
   ["error", [start(), tool("bash"), done(false)]],
   ["exhausted", [start(), ev({ type: "AGENT_BLOCKED", reason: "rate_limit" })]],
@@ -57,6 +60,18 @@ const ROUTES: ReadonlyArray<[PetState, PetMachineEvent[]]> = [
     "celebrating",
     [start(), prompt(T0), tool("bash", T0 + 1), ev({ type: "TURN_END" }, T0 + 20_000)],
   ],
+];
+
+/**
+ * States the watchdog must not sweep: the pet is asking the user for something,
+ * and five quiet minutes usually means they stepped away — which is exactly
+ * when the request most needs to survive.
+ */
+const ATTENTION_EXEMPT: readonly string[] = [
+  "sleeping",
+  "waiting_approval",
+  "waiting_input",
+  "exhausted",
 ];
 
 describe("reachability", () => {
@@ -193,6 +208,7 @@ describe("celebrationWorthy (D5)", () => {
       hadFailureThisTurn: false,
       hopCount: 0,
       blockedReason: null,
+      activity: null,
     };
     expect(celebrationWorthy(base, 15_000)).toBe(true);
     expect(celebrationWorthy(base, 14_999)).toBe(false);
@@ -270,17 +286,16 @@ describe("watchdog (I4)", () => {
   it.each([
     ["waiting_approval", ev({ type: "APPROVAL_NEEDED" })],
     ["exhausted", ev({ type: "AGENT_BLOCKED", reason: "rate_limit" })],
+    ["waiting_input", ev({ type: "INPUT_NEEDED" })],
   ] as const)("leaves %s alone — silence there is expected, not suspicious", (want, event) => {
-    // These two are the pet asking the user for something. Sweeping them away
+    // These are the pet asking the user for something. Sweeping them away
     // after five quiet minutes would hide the request exactly when the user has
     // stepped away and most needs to see it on return.
     expect(stateAfter([start(), event, tick(T0 + DELAYS.WATCHDOG * 10)])).toBe(want);
   });
 
   it("sweeps every other non-sleeping state", () => {
-    const sweepable = ROUTES.filter(
-      ([s]) => !["sleeping", "waiting_approval", "exhausted"].includes(s),
-    );
+    const sweepable = ROUTES.filter(([s]) => !ATTENTION_EXEMPT.includes(s));
     for (const [name, route] of sweepable) {
       expect(stateAfter([...route, tick(T0 + DELAYS.WATCHDOG * 10)]), name).toBe("sleeping");
     }
@@ -292,5 +307,69 @@ describe("toPetState", () => {
     expect(toPetState("idle")).toBe("idle");
     expect(toPetState({ working: "digging" })).toBe("working.digging");
     expect(toPetState(undefined)).toBe("idle");
+  });
+});
+
+describe("the activity the pet reports", () => {
+  /**
+   * Every `TOOL_START` branch, including the fallback.
+   *
+   * The fallback shipped without `recordActivity` because it was written on one
+   * line while its three siblings were multi-line, so a mechanical edit matched
+   * them and missed it — the same shape as the `generate_handler!` macro that
+   * lost three commands to a reformat. A table is the fix: a new branch that
+   * forgets to record is a new row that fails.
+   */
+  const CASES: ReadonlyArray<[ToolKind, string]> = [
+    ["bash", "working.digging"],
+    ["file_edit", "working.typing"],
+    ["file_read", "working.reading"],
+    ["search", "working.reading"],
+    ["network", "working.generic"],
+    ["delegate", "working.delegating"],
+    ["other", "working.generic"],
+  ];
+
+  it.each(CASES)("records %s and lands in %s", (tool, expected) => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool, at: 1_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe(expected);
+    expect(actor.getSnapshot().context.activity).toBe(tool);
+    actor.stop();
+  });
+
+  it("forgets the tool once it finishes, rather than naming a finished one", () => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "bash", at: 1_000 } as PetMachineEvent);
+    expect(actor.getSnapshot().context.activity).toBe("bash");
+
+    actor.send({ type: "TOOL_DONE", ok: true, tool: "bash", at: 2_000 } as PetMachineEvent);
+    expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
+  });
+
+  it("stops naming the delegate once the subagent comes back", () => {
+    // Caught live: the pet went on saying "sent a friend" after the friend had
+    // returned. Every other exit from work clears the activity; this one is a
+    // root transition and was written separately, which is how it was missed.
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "delegate", at: 1_000 } as PetMachineEvent);
+    expect(toPetState(actor.getSnapshot().value)).toBe("working.delegating");
+
+    actor.send({ type: "SUBAGENT_END", at: 2_000 } as PetMachineEvent);
+    expect(toPetState(actor.getSnapshot().value)).toBe("working.generic");
+    expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
+  });
+
+  it("does not carry an activity out of the work states", () => {
+    const actor = createActor(petMachine).start();
+    actor.send({ type: "TOOL_START", tool: "network", at: 1_000 } as PetMachineEvent);
+    actor.send({ type: "APPROVAL_NEEDED", at: 2_000 } as PetMachineEvent);
+
+    expect(toPetState(actor.getSnapshot().value)).toBe("waiting_approval");
+    expect(actor.getSnapshot().context.activity).toBeNull();
+    actor.stop();
   });
 });

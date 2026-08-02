@@ -791,6 +791,40 @@ Still blocked on things no code fixes: signing needs an Apple identity, Windows
 and Linux need hosts, and one visual confirmation of the overlay needs Screen
 Recording permission. Tracked in [`docs/RELEASE.md`](docs/RELEASE.md), not here.
 
+### M5 — The pet reads as a pet (added after M4)
+
+M4 finished the plumbing. Everything measured to that point was about whether
+the pet was *correct*; nothing had asked whether it was any good to have on
+screen. Two answers were no.
+
+It said nothing while working — the bubble covered four attention states and was
+silent for the majority of the time the pet is visible. And it never moved: the
+window sat where it was placed for its whole life, animating a run cycle on the
+spot, with atlas row 2 (`running-left`) unused entirely.
+
+- [x] **Say which task the agent is on.** Driven by `ToolKind`, never by the
+      adapter's `label` — a label would carry agent-authored text into pet-core
+      at runtime, which is the coupling I5 forbids and the one the lint cannot
+      see, because there would be no string in the source to grep for.
+- [x] **Pace while working.** Only while working: not idle, not asleep, and
+      deliberately not while waiting on an approval, because a request that
+      wanders away from where the user last saw it is worse than one that sits
+      still. The shell owns the motion; the frontend sends two messages per
+      burst of work rather than one per frame.
+- [x] **Make the Vietnamese strings reachable.** They had existed since M1 and
+      `locale` was hardcoded to `"en"`, so nothing could ever display them.
+- [x] **Catch the hooks we were dropping, and give them states.** `PreCompact`
+      and `SubagentStop` were never registered at all; `SUBAGENT_START`/`_END`
+      had sat in the wire format since M0 marked "accepted and ignored"; and
+      `agent_needs_input` was folded into `AGENT_IDLE`, which made *the agent
+      asked you a question* look exactly like *the agent has nothing to do*.
+      Eleven states became fourteen: `working.delegating`, `compacting`,
+      `waiting_input`.
+
+**The constraint that shaped it:** I6. Movement means a timer, and a timer is
+what M1's review removed. So the ticker exists only while the pet is walking —
+created when work starts, dropped when the pet gets home. Off is a real off.
+
 ---
 
 ## 15. Out of scope

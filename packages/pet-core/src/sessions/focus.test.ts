@@ -8,7 +8,15 @@ function view(
   lastEventAt: number,
   extra: Partial<SessionView> = {},
 ): SessionView {
-  return { sessionId, source: "test", state, lastEventAt, blockedReason: null, ...extra };
+  return {
+    sessionId,
+    source: "test",
+    state,
+    lastEventAt,
+    blockedReason: null,
+    activity: null,
+    ...extra,
+  };
 }
 
 describe("needsAttention", () => {

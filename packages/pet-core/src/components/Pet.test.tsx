@@ -157,12 +157,42 @@ describe("StateGlyph", () => {
 describe("SpeechBubble", () => {
   it("says something for the states that need the user", () => {
     render(<SpeechBubble state="waiting_approval" />);
-    expect(screen.getByText(/approve/i)).toBeTruthy();
+    expect(screen.getByText(/may i/i)).toBeTruthy();
   });
 
-  it("stays silent while the agent is just working", () => {
-    render(<SpeechBubble state="working.digging" />);
-    expect(document.querySelector(".pet-bubble")).toBeNull();
+  it("names the work in flight rather than the state", () => {
+    // The state alone cannot tell these apart — both are `working.digging`
+    // until you know which tool is running.
+    const { unmount } = render(<SpeechBubble state="working.digging" activity="bash" />);
+    expect(screen.getByText(/crunching/i)).toBeTruthy();
+    unmount();
+
+    render(<SpeechBubble state="working.digging" activity="search" />);
+    expect(screen.getByText(/sniffing/i)).toBeTruthy();
+  });
+
+  it("falls back to a general word between two tool calls", () => {
+    // The machine clears the activity when a tool finishes, so this is the real
+    // gap between calls — not a hypothetical.
+    render(<SpeechBubble state="working.generic" activity={null} />);
+    expect(screen.getByText(/on it/i)).toBeTruthy();
+  });
+
+  it("puts the user's request ahead of whatever tool caused it", () => {
+    render(<SpeechBubble state="waiting_approval" activity="bash" />);
+    expect(screen.getByText(/may i/i)).toBeTruthy();
+    expect(document.querySelector(".pet-bubble")?.textContent).not.toMatch(/crunching/i);
+  });
+
+  it("lets a pack override win, even mid-tool", () => {
+    render(
+      <SpeechBubble
+        state="working.digging"
+        activity="bash"
+        overrides={{ "working.digging": "ribbit" }}
+      />,
+    );
+    expect(screen.getByText("ribbit")).toBeTruthy();
   });
 
   it("names the project when one was supplied", () => {
@@ -171,8 +201,12 @@ describe("SpeechBubble", () => {
   });
 
   it("speaks Vietnamese when asked", () => {
-    render(<SpeechBubble state="exhausted" locale="vi" />);
-    expect(screen.getByText(/Hết lượt/)).toBeTruthy();
+    const { unmount } = render(<SpeechBubble state="exhausted" locale="vi" />);
+    expect(screen.getByText(/Hết pin/)).toBeTruthy();
+    unmount();
+
+    render(<SpeechBubble state="working.digging" locale="vi" activity="search" />);
+    expect(screen.getByText(/Đánh hơi/)).toBeTruthy();
   });
 });
 

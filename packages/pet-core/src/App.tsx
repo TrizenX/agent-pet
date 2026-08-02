@@ -11,9 +11,11 @@ import { listenForScenarios } from "./demo/runner.ts";
 import { stopListening } from "./events.ts";
 import { useAgentEvents } from "./hooks/useAgentEvents.ts";
 import { selectPack, useShellSettings } from "./hooks/useShellSettings.ts";
+import { useWalk } from "./hooks/useWalk.ts";
 import { loadDefaultPack } from "./packs/defaultPack.ts";
 import { loadInstalledPacks } from "./packs/discovery.ts";
 import type { LoadedPack } from "./packs/loader.ts";
+import { resolveLocale, speechFor } from "./packs/strings.ts";
 
 /**
  * The whole pet.
@@ -94,14 +96,21 @@ export function App() {
   }, [rescanPacks]);
 
   const state = snapshot.focused?.state ?? "sleeping";
+  const facing = useWalk(state, shell.wander && !reducedMotion);
 
   // Surfaced through the console bridge so the rendered state is observable
   // from outside the window. An overlay has nowhere to show what it thinks it
   // is doing, and "the pet looks wrong" is not a debuggable report.
   // Declared before the early return below: hooks cannot sit behind a branch.
+  const activity = snapshot.focused?.activity ?? null;
+  const locale = resolveLocale(shell.locale);
   useEffect(() => {
-    console.log(`[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""}`);
-  }, [state, snapshot.label]);
+    // The spoken line too, not just the state. What the pet *says* is the part
+    // a user reports, and two states can say the same word while one activity
+    // makes two identical states say different ones.
+    const said = speechFor(state, locale, undefined, activity) ?? "—";
+    console.log(`[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""} says "${said}"`);
+  }, [state, snapshot.label, locale, activity]);
 
   // The tray can persist a pack the frontend cannot find, and the fallback to
   // the built-in pet looks identical to never having chosen one. Saying so
@@ -129,10 +138,16 @@ export function App() {
 
   return (
     <div className="pet-root" data-tauri-drag-region>
-      <SpeechBubble state={state} project={snapshot.label} />
+      <SpeechBubble state={state} project={snapshot.label} locale={locale} activity={activity} />
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
-      <Pet pack={active} state={state} scale={shell.scale} reducedMotion={reducedMotion} />
+      <Pet
+        pack={active}
+        state={state}
+        scale={shell.scale}
+        reducedMotion={reducedMotion}
+        facing={facing}
+      />
       <EventLog entries={log} open={logOpen} onClose={() => setLogOpen(false)} />
       <PackPicker
         open={pickerOpen}
