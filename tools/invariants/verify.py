@@ -426,6 +426,12 @@ def soak(port: int, root_pid: int, minutes: float) -> Check:
 # --------------------------------------------------------------------------- main
 
 def main() -> int:
+    # Line-buffered, because this run lasts hours and is usually watched
+    # through a pipe. Python block-buffers stdout there, so killing a soak part
+    # way threw away everything it had already printed — including the seven
+    # checks that had passed before the long wait started.
+    sys.stdout.reconfigure(line_buffering=True)
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True, type=Path)
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
