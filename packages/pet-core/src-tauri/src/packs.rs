@@ -13,7 +13,12 @@ use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscoveredPack {
-    /// Directory name, which is also the id users see in the tray.
+    /// Directory name.
+    ///
+    /// This is *the* id — what the tray shows, what a selection persists, and
+    /// what the frontend keys the loaded pack by. Deliberately not the `id`
+    /// inside `pet.json`: the two differ for roughly one pack in ten, and when
+    /// they did, choosing that pack silently showed the built-in pet instead.
     pub id: String,
     /// Absolute path to `pet.json`.
     pub manifest: String,
@@ -47,7 +52,8 @@ fn dirs_home() -> Option<PathBuf> {
 /// unchecked `spritesheetPath` of `/etc/passwd` becomes exactly that.
 fn is_plain_file_name(s: &str) -> bool {
     let mut components = Path::new(s).components();
-    matches!(components.next(), Some(std::path::Component::Normal(_))) && components.next().is_none()
+    matches!(components.next(), Some(std::path::Component::Normal(_)))
+        && components.next().is_none()
 }
 
 /// Whether `dir` really lives under `root` once symlinks are resolved.

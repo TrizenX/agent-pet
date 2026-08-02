@@ -94,7 +94,12 @@ fn main() {
             let found = packs::discover(app.handle());
             println!("[packs] discovered {}", found.len());
             for p in &found {
-                println!("[packs]   {} ({}) sheet={:?}", p.id, p.root, p.sheet.is_some());
+                println!(
+                    "[packs]   {} ({}) sheet={:?}",
+                    p.id,
+                    p.root,
+                    p.sheet.is_some()
+                );
             }
             let shared = std::sync::Arc::new(tray::AppState {
                 settings: std::sync::Mutex::new(saved.clone()),
