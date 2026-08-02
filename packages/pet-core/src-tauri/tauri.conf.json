@@ -32,11 +32,7 @@
       "devCsp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$APPCONFIG/packs/**",
-          "$HOME/.petdex/pets/**",
-          "$HOME/.codex/pets/**"
-        ]
+        "scope": ["$APPCONFIG/packs/**", "$HOME/.petdex/pets/**", "$HOME/.codex/pets/**"]
       }
     },
     "trayIcon": {

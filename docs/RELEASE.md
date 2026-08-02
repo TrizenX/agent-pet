@@ -30,6 +30,7 @@ The bundled pet is placeholder art. It is ours and it ships fine (see [`IP_POLIC
 ## Before tagging
 
 ```sh
+rm -rf packages/pet-core/{dist,node_modules/.vite}   # see vite.config.ts
 pnpm verify                                    # typecheck, lint, I5, hooks drift, tests
 pnpm verify:rust                               # rustfmt --check, then cargo test
 node packages/adapter-claude-code/src/cli.ts record --install   # re-record fixtures
