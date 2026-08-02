@@ -1,4 +1,5 @@
 import { claudeCodeAdapter } from "@agent-pet/adapter-claude-code/mapping";
+import { gitAdapter } from "@agent-pet/adapter-git/mapping";
 import type { PetAdapter } from "@agent-pet/protocol";
 
 /**
@@ -8,7 +9,7 @@ import type { PetAdapter } from "@agent-pet/protocol";
  *
  * Adding an agent in Phase 2 is one line here and nothing else.
  */
-export const ADAPTERS: readonly PetAdapter[] = [claudeCodeAdapter];
+export const ADAPTERS: readonly PetAdapter[] = [claudeCodeAdapter, gitAdapter];
 
 const BY_ID = new Map(ADAPTERS.map((a) => [a.id, a]));
 

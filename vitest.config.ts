@@ -10,6 +10,10 @@ export default defineConfig({
         "./packages/adapter-claude-code/src/mapping.ts",
         import.meta.url,
       ).pathname,
+      "@agent-pet/adapter-git/mapping": new URL(
+        "./packages/adapter-git/src/mapping.ts",
+        import.meta.url,
+      ).pathname,
     },
   },
   test: {

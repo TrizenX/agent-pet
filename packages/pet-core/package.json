@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@agent-pet/adapter-claude-code": "workspace:*",
+    "@agent-pet/adapter-git": "workspace:*",
     "@agent-pet/protocol": "workspace:*",
     "@tauri-apps/api": "^2.11.1",
     "react": "^19.2.8",

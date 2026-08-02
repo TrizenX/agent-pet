@@ -33,11 +33,20 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/adapter-git:
+    dependencies:
+      '@agent-pet/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/pet-core:
     dependencies:
       '@agent-pet/adapter-claude-code':
         specifier: workspace:*
         version: link:../adapter-claude-code
+      '@agent-pet/adapter-git':
+        specifier: workspace:*
+        version: link:../adapter-git
       '@agent-pet/protocol':
         specifier: workspace:*
         version: link:../protocol

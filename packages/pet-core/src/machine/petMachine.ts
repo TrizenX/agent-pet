@@ -109,6 +109,17 @@ const initialContext: PetContext = {
 export function celebrationWorthy(ctx: PetContext, at: number): boolean {
   return (
     ctx.toolsThisTurn >= CELEBRATION_MIN_TOOLS &&
+    // A turn we never saw begin is a turn whose length we do not know.
+    //
+    // `turnStartedAt` is only set by `PROMPT_SUBMITTED`, and it starts at zero.
+    // So for any adapter that has no notion of a prompt, `at - 0` is the whole
+    // epoch and the duration test passed unconditionally — every single turn
+    // earned a trophy. Found the moment a second adapter existed: `git commit`
+    // celebrated, and would have celebrated every commit forever, which is
+    // exactly the training-to-ignore-it failure D5 exists to prevent.
+    //
+    // The guard silently assumed an event only one agent happens to send.
+    ctx.turnStartedAt > 0 &&
     at - ctx.turnStartedAt >= CELEBRATION_MIN_MS &&
     !ctx.hadFailureThisTurn
   );
