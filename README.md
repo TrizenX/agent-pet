@@ -46,6 +46,9 @@ node packages/adapter-claude-code/src/cli.ts doctor
 - **[`PET_PROJECT_SPEC.md`](PET_PROJECT_SPEC.md)** — the single source of truth. §2 lists the hard invariants; §13 lists decisions that are already closed.
 - **[`artifacts/spike-d/FINDINGS.md`](artifacts/spike-d/FINDINGS.md)** — M0 Spike D: how the sprite atlas layout was derived from real sheets, and the two spec corrections it forced.
 - **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — event flow and how to add an adapter.
+- **[`docs/PET_PACKS.md`](docs/PET_PACKS.md)** — authoring a pack: which atlas rows the pet actually uses.
+- **[`docs/IP_POLICY.md`](docs/IP_POLICY.md)** — we render other people's pets and never redistribute them.
+- **[`docs/RELEASE.md`](docs/RELEASE.md)** — what blocks a release, separated from what is merely undone.
 
 ## Develop
 
@@ -69,7 +72,7 @@ python3 tools/spike-atlas/verify_rows.py  --out artifacts/spike-d --work /tmp/sp
 
 **I5 — `pet-core` names no agent.** Exactly one file, `packages/pet-core/src/adapters/registry.ts`, may import an adapter. `pnpm lint:no-agent-strings` fails the build otherwise. Supporting a second agent is meant to be one line there and nothing else.
 
-**Art licensing.** The pet packs this app renders come from a community gallery whose contents are user-submitted fan art with disclaimed IP. We render other people's pets; we never bundle, mirror, or redistribute them, and only original licence-cleared art ever ships in a release. See spec §17.2.
+**We render other people's pets; we never redistribute them.** The packs come from community galleries whose contents are user-submitted fan art with disclaimed IP. Rendering a file a user installed is not distributing it — committing one would be. That rule does not depend on the app being free: being the distributor is a different position from being a renderer, and this repo is MIT, so it cannot carry art we do not own. See [`docs/IP_POLICY.md`](docs/IP_POLICY.md).
 
 ## Licence
 
