@@ -112,6 +112,41 @@ still never been entered by a real event. The mapping is exercised by
 hand-written payloads and by `BLOCK_REASONS`, and neither is evidence about the
 shape upstream actually sends.
 
+## `exhausted` is interactive-only, and now that is measured rather than assumed
+
+`StopFailure` is the sole input to `exhausted`, which §7.1 calls the highest-value
+state in the product. I had recorded it as "needs a genuine rate limit, cannot be
+manufactured". That was giving up early on two counts.
+
+**`rate_limit` is one of eight.** Every entry in `BLOCK_REASONS` — overloaded,
+billing, auth, invalid_request, server_error — lands in the same `AGENT_BLOCKED`
+event and the same state. Any real API failure would have done.
+
+**And an API failure can be manufactured**, without burning a token or touching
+an account: point the client at a server that fails. `ANTHROPIC_BASE_URL` at a
+local endpoint returning `429` with a `rate_limit_error` body is a real rate
+limit as far as the real client is concerned.
+
+Two variants were run against a real headless session:
+
+| endpoint returns | what happened | hooks fired |
+| :-- | :-- | :-- |
+| `429 rate_limit_error` | the client retried with backoff for over ten minutes | `UserPromptSubmit`, `SessionEnd` |
+| `401 authentication_error` | failed immediately | `UserPromptSubmit`, `SessionEnd` |
+
+**No `StopFailure` in either case.** The turn failed and the session simply ended.
+
+That completes a pattern rather than adding an isolated fact. Four hooks have
+never appeared in any headless run — `SessionStart`, `PermissionRequest`,
+`PermissionDenied`, `StopFailure` — while `PermissionRequest` and `Notification`
+*were* captured from the user's live interactive sessions. They are not missing
+because the right conditions never arose; `-p` does not emit the interaction and
+lifecycle hooks at all.
+
+So `exhausted` needs an interactive session that hits an API failure. That is a
+narrower and more actionable statement than "needs a rate limit": it does not
+need quota to run out, only a human at a keyboard when something upstream breaks.
+
 ## Capturing the rest
 
 The remaining four need an interactive session, which means a human at a

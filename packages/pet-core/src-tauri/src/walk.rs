@@ -18,7 +18,7 @@
 //! from where the user last saw it is worse than one that sits still.
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use tauri::{Emitter, Manager};
 
