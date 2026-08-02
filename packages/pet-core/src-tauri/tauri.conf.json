@@ -15,8 +15,8 @@
       {
         "label": "pet",
         "title": "Agent Pet",
-        "width": 320,
-        "height": 240,
+        "width": 420,
+        "height": 430,
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,

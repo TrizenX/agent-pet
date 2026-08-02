@@ -70,11 +70,15 @@ export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps)
   const fh = FRAME_HEIGHT * scale;
   useStepKeyframes(fw);
 
-  // The speech bubble sits relative to the pet's head, and only the renderer
-  // knows how tall the pet currently is.
+  // Everything that hangs off the pet — the bubble above its head, the badge
+  // and the glyph at its shoulders — is positioned from these. The window is
+  // sized for the largest pet at the tallest bubble, so anchoring to the window
+  // instead leaves them floating in empty space around a small pet.
   useEffect(() => {
-    document.documentElement.style.setProperty("--pet-h", `${fh}px`);
-  }, [fh]);
+    const root = document.documentElement.style;
+    root.setProperty("--pet-h", `${fh}px`);
+    root.setProperty("--pet-w", `${fw}px`);
+  }, [fh, fw]);
 
   // I6, and §7.4. A `sleeping` pet holds one frame with no animation at all —
   // not a slow one. `prefers-reduced-motion` gets the same treatment.
