@@ -105,13 +105,16 @@ export function App() {
   const activity = snapshot.focused?.activity ?? null;
   const activityLabel = snapshot.focused?.activityLabel ?? null;
   const locale = resolveLocale(shell.locale);
+  // Derived once, here, and both rendered and logged from the same value.
+  const said = speechFor(state, locale, undefined, activity, activityLabel);
   useEffect(() => {
     // The spoken line too, not just the state. What the pet *says* is the part
-    // a user reports, and two states can say the same word while one activity
-    // makes two identical states say different ones.
-    const said = speechFor(state, locale, undefined, activity, activityLabel) ?? "—";
-    console.log(`[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""} says "${said}"`);
-  }, [state, snapshot.label, locale, activity, activityLabel]);
+    // a user reports, and this is provably that string rather than a second
+    // guess at it.
+    console.log(
+      `[pet] ${state}${snapshot.label ? ` (${snapshot.label})` : ""} says "${said ?? "—"}"`,
+    );
+  }, [state, snapshot.label, said]);
 
   // The tray can persist a pack the frontend cannot find, and the fallback to
   // the built-in pet looks identical to never having chosen one. Saying so
@@ -139,7 +142,7 @@ export function App() {
 
   return (
     <div className="pet-root">
-      <SpeechBubble state={state} project={snapshot.label} locale={locale} activity={activity} />
+      <SpeechBubble text={said} project={snapshot.label} />
       <SessionBadge count={snapshot.liveCount} />
       <StateGlyph state={state} enabled={shell.glyphs_enabled} reducedMotion={reducedMotion} />
       <Pet

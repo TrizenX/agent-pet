@@ -70,6 +70,12 @@ export function Pet({ pack, state, scale, reducedMotion, facing = 0 }: PetProps)
   const fh = FRAME_HEIGHT * scale;
   useStepKeyframes(fw);
 
+  // The speech bubble sits relative to the pet's head, and only the renderer
+  // knows how tall the pet currently is.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--pet-h", `${fh}px`);
+  }, [fh]);
+
   // I6, and §7.4. A `sleeping` pet holds one frame with no animation at all —
   // not a slow one. `prefers-reduced-motion` gets the same treatment.
   const still = reducedMotion || anim.mode === "static" || anim.fpsScale === 0;

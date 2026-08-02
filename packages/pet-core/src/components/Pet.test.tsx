@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { COLUMNS, FRAME_HEIGHT, FRAME_WIDTH, ROW_INDEX } from "../packs/atlas.ts";
 import { buildPack, type LoadedPack } from "../packs/loader.ts";
 import type { PetState } from "../packs/stateMap.ts";
+import { speechFor } from "../packs/strings.ts";
 import { Pet } from "./Pet.tsx";
 import { SessionBadge } from "./SessionBadge.tsx";
 import { SpeechBubble } from "./SpeechBubble.tsx";
@@ -154,69 +155,63 @@ describe("StateGlyph", () => {
   });
 });
 
-describe("SpeechBubble", () => {
-  it("says something for the states that need the user", () => {
-    render(<SpeechBubble state="waiting_approval" />);
-    expect(screen.getByText(/may i/i)).toBeTruthy();
-  });
+describe("what the pet says", () => {
+  // The wording lives in `speechFor`; the bubble only renders it. Tested at the
+  // function rather than through the component, because the component having
+  // its own copy of this logic is what let it disagree with the log for three
+  // rounds without a single test failing.
 
   it("names what the work is on, not just what kind it is", () => {
     // The whole point, and the thing the first version got wrong: "Running…"
     // tells you nothing you could not already see. "Running pnpm test" does.
-    const { unmount } = render(
-      <SpeechBubble state="working.digging" activity="bash" activityLabel="pnpm test" />,
+    expect(speechFor("working.digging", "en", undefined, "bash", "pnpm test")).toBe(
+      "Running pnpm test",
     );
-    expect(screen.getByText("Running pnpm test")).toBeTruthy();
-    unmount();
-
-    render(<SpeechBubble state="working.typing" activity="file_edit" activityLabel="mapping.ts" />);
-    expect(screen.getByText("Editing mapping.ts")).toBeTruthy();
+    expect(speechFor("working.typing", "en", undefined, "file_edit", "mapping.ts")).toBe(
+      "Editing mapping.ts",
+    );
   });
 
   it("falls back to the bare verb when the adapter sent no label", () => {
-    render(<SpeechBubble state="working.digging" activity="bash" />);
-    expect(screen.getByText("Running…")).toBeTruthy();
+    expect(speechFor("working.digging", "en", undefined, "bash", null)).toBe("Running…");
   });
 
   it("says it is thinking in the gap between two tool calls", () => {
     // The machine clears the activity when a tool finishes, so this is the real
-    // gap between calls — and in that gap the model is deciding what to do
-    // next. It used to say "On it!", which answers nothing.
-    render(<SpeechBubble state="working.generic" activity={null} />);
-    expect(screen.getByText(/thinking/i)).toBeTruthy();
+    // gap between calls — and in it the model is deciding what to do next.
+    expect(speechFor("working.generic", "en", undefined, null, null)).toMatch(/thinking/i);
   });
 
   it("puts the user's request ahead of whatever tool caused it", () => {
-    render(<SpeechBubble state="waiting_approval" activity="bash" />);
-    expect(screen.getByText(/may i/i)).toBeTruthy();
-    expect(document.querySelector(".pet-bubble")?.textContent).not.toMatch(/running/i);
+    expect(speechFor("waiting_approval", "en", undefined, "bash", "rm -rf /")).toBe("May I?");
   });
 
   it("lets a pack override win, even mid-tool", () => {
-    render(
-      <SpeechBubble
-        state="working.digging"
-        activity="bash"
-        overrides={{ "working.digging": "ribbit" }}
-      />,
-    );
-    expect(screen.getByText("ribbit")).toBeTruthy();
-  });
-
-  it("names the project when one was supplied", () => {
-    render(<SpeechBubble state="waiting_approval" project="acme-api" />);
-    expect(screen.getByText("acme-api")).toBeTruthy();
+    expect(
+      speechFor("working.digging", "en", { "working.digging": "ribbit" }, "bash", "pnpm test"),
+    ).toBe("ribbit");
   });
 
   it("speaks Vietnamese when asked", () => {
-    const { unmount } = render(<SpeechBubble state="exhausted" locale="vi" />);
-    expect(screen.getByText(/Hết pin/)).toBeTruthy();
-    unmount();
+    expect(speechFor("exhausted", "vi")).toMatch(/Hết pin/);
+    expect(speechFor("working.digging", "vi", undefined, "search", "TODO")).toBe("Tìm TODO");
+  });
+});
 
-    render(
-      <SpeechBubble state="working.digging" locale="vi" activity="search" activityLabel="TODO" />,
-    );
-    expect(screen.getByText("Tìm TODO")).toBeTruthy();
+describe("SpeechBubble", () => {
+  it("renders the line it is given", () => {
+    render(<SpeechBubble text="Running pnpm test" />);
+    expect(screen.getByText("Running pnpm test")).toBeTruthy();
+  });
+
+  it("says nothing when there is nothing to say", () => {
+    render(<SpeechBubble text={undefined} />);
+    expect(document.querySelector(".pet-bubble")).toBeNull();
+  });
+
+  it("names the project when one was supplied", () => {
+    render(<SpeechBubble text="May I?" project="acme-api" />);
+    expect(screen.getByText("acme-api")).toBeTruthy();
   });
 });
 

@@ -73,7 +73,12 @@ body {
 
 .pet-bubble {
   position: absolute;
-  top: 2px;
+  /* Above the pet's head, not at the top of the window.
+     The window is a fixed 320x240 while the sprite is 0.75x, 1x or 1.5x of
+     192x208, so a bubble pinned to the top drifted further from the pet the
+     smaller it got. `--pet-h` is the rendered sprite height, set by the
+     renderer, so the gap stays 6px at every size. */
+  bottom: calc(var(--pet-h, 208px) + 6px);
   left: 50%;
   transform: translateX(-50%);
   /* The window is deliberately much wider than the pet so this has room. It
