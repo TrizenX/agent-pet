@@ -62,6 +62,8 @@ export function classifyTool(toolName: unknown): ToolKind {
  * where there is not — never a full command line, never a prompt.
  */
 const MAX_LABEL = 52;
+/** Program plus subcommands. Past this a command line is arguments, not identity. */
+const MAX_COMMAND_WORDS = 4;
 
 function trim(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -114,13 +116,19 @@ function commandName(command: unknown): string | undefined {
   const last = (segments.at(-1) ?? command).split("\n")[0] ?? "";
   // Flags are noise competing for a narrow bubble: `grep -n -B3 -A22 "def x"`
   // spends most of its width saying nothing, and truncation then eats the
-  // pattern — the one part worth reading. Dropping them keeps the program and
-  // its arguments, which is what makes a command recognisable.
-  const meaningful = last
-    .split(/\s+/)
-    .filter((w, i) => i === 0 || !w.startsWith("-"))
-    .join(" ");
-  return trim(meaningful || last);
+  // pattern — the one part worth reading.
+  //
+  // But dropping a flag while keeping its *value* is worse than either. It
+  // turned `gh pr view 32 --repo TrizenX/agent-pet --json statusCheckRollup -q
+  // '…'` into "gh pr view 32 TrizenX/agent-pet statusCheckRollup …" — a tail of
+  // orphaned arguments that reads as gibberish. "gh pr view 32" was the answer,
+  // and it was already the first four words.
+  //
+  // Four, because that is where subcommands stop: `gh pr view 32`,
+  // `docker compose up`, `pnpm tauri build`. And it still leaves `grep TODO
+  // src/` intact, which is the case that started all this.
+  const words = last.split(/\s+/).filter((w, i) => i === 0 || !w.startsWith("-"));
+  return trim(words.slice(0, MAX_COMMAND_WORDS).join(" ") || last);
 }
 
 export function describeTool(toolName: unknown, toolInput: unknown): string | undefined {
