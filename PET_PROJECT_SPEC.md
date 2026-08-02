@@ -709,7 +709,7 @@ Do not reopen these while implementing.
 | D8 | xstate is kept despite being heavy for nine states | Declarative `after` timers make I4 verifiable, and transitions are cheap to test without Tauri. |
 | D9 | Auto-port-fallback on a busy port is **rejected** | Hooks hardcode the port in a URL. Silently moving ports means silent breakage. Fail loudly instead. |
 | D10 | **Adopt the existing Petdex/Codex atlas format; do not invent `.petpack`** | 4 289 compatible pets exist today and the format is already shared by ChatGPT.app, Petdex and ~21 downstream projects. A rival format would mean solving art from zero against an incumbent. Cost: 9 fixed rows instead of our 10 named states — paid for by the glyph layer (§9.5). |
-| D11 | **Only original, licence-cleared art ships in the bundle.** Third-party pets are user-installed at runtime, never re-hosted by us | The public galleries are explicitly user-submitted fan art with disclaimed IP. That is survivable for a free gallery and fatal for a paid, notarised, App-Store-bound product. See §17.2. |
+| D11 | **Only original, licence-cleared art ships in the bundle.** Third-party pets are user-installed at runtime, never re-hosted by us | The public galleries are explicitly user-submitted fan art with disclaimed IP. The rule survives the app being free for two reasons that do not depend on price: a distributor is a different position from a renderer, and an MIT repository cannot carry art we do not own. See §17.2. |
 | D12 | Our differentiator is **instrument fidelity**, not the existence of a pet | Free MIT competitors already ship a floating pet with thousands of skins. What they do not have: 11 hook events, `exhausted`, multi-session focus, and I1/I2 as tested guarantees. §17.3. |
 
 ---
@@ -800,12 +800,14 @@ Two unknowns can invalidate the design. Prove them before building anything.
 
 The galleries state their position plainly: *"Pets are user-submitted fan art. AgentPets does not claim rights to any underlying IP"* / *"pet assets remain owned by their submitters and original rights holders."* A keyword scan of the 4 289-pet manifest surfaces **Homelander, Goku, Pikachu, Doraemon, Totoro, Naruto, Kirby, Gojo, Pochita, Hello Kitty, Sonic** within the first pass alone — and 2 132 of those pets are typed `character`, so the real figure is far higher.
 
-That posture is survivable for a free gallery with a takedown form. It is fatal for a paid, notarised, App-Store-bound product. Therefore:
+We give this away rather than sell it, and that changes the exposure — though not in the direction the first draft assumed. Fan art is unlicensed whether or not money changes hands; what free distribution buys is a takedown notice rather than a lawsuit. So the caution appropriate to a paid, App-Store-bound product comes off, and what is left is narrower and firmer:
 
-1. **Nothing ships in our bundle without a licence we hold.** The default pet is commissioned original art with a written **work-for-hire / full commercial + redistribution** grant, or a CC0 asset (Kenney.nl and CC0-filtered OpenGameArt are acceptable stopgaps through M2).
-2. **We never re-host, mirror, cache-to-CDN, or redistribute third-party pets.** The user installs them; the bytes travel from the gallery's CDN to their disk. We are a renderer, not a distributor.
-3. **No character names, no fan art, in any marketing asset, screenshot, landing page, or App Store listing.** Every promotional frame uses our own pet.
+1. **We never re-host, mirror, cache-to-CDN, or redistribute third-party pets.** The user installs them; the bytes travel from the gallery's CDN to their disk. We are a renderer, not a distributor — a difference in kind rather than degree. A renderer has nothing to take down.
+2. **Nothing ships in our bundle without a licence we hold.** Not for fear of a claim: this repository is MIT, and a pack committed into it would make `LICENSE` a false statement about part of the tree. CC0 or our own, and no third option.
+3. **No character names in any marketing asset, screenshot, or landing page.** Every promotional frame uses our own pet. The pets a user installs are theirs to choose; they are not our advertising.
 4. `docs/IP_POLICY.md` states 1–3 publicly, so users understand exactly what they are installing and from whom.
+
+Rules 1 and 2 are enforced rather than intended: `.gitignore` excludes `*.webp` and `artifacts/**/*.png`, and the spike tooling downloads to a scratch directory outside the repository. Commissioning original art is no longer a release blocker (TZX-73) — the placeholder is ours and it ships.
 
 ### 17.3 Where the gap actually is
 
