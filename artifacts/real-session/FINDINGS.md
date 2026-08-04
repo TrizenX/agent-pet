@@ -439,85 +439,100 @@ thing.
 
 ---
 
-# TZX-97: the pet was invisible because the page was too transparent
+# TZX-97: the pet was invisible, and I got the cause wrong
 
-The window was never the problem. I spent a day proving things about it.
+The pet did not appear. That part is solid: a window-id capture returned
+`alpha min/max = (0, 0)` — not one painted pixel — and the person at the keyboard
+confirmed seeing nothing.
 
-## What it was
+Then I found a "cause", shipped it, and it was wrong. This section is the
+correction, kept in full because the mistake is more instructive than the fix
+would have been.
 
-A fully transparent page makes WKWebView composite **none of the layer**. Not
-"the transparent parts" — none of it. The opaque sprite and the dark speech
-bubble were dropped along with the empty space.
+## What I claimed
 
-Measured by capturing the window by id, which is the only capture that ignores
-which Space is active:
+That a fully transparent page makes WKWebView composite none of the layer, and
+that `.pet-root { background: rgba(0,0,0,0.01) }` fixed it. The evidence looked
+excellent:
 
-| `.pet-root` background | alpha extrema | what appears |
+| `.pet-root` | alpha extrema | what appeared |
 | :-- | :-- | :-- |
-| `transparent` | `(0, 0)` | nothing, not one painted pixel |
-| `rgba(0,0,0,0.01)` | `(3, 255)` | the pet and the bubble |
+| `transparent` | `(0, 0)` | nothing |
+| `#ff0000` | opaque | the penguin and "Nghỉ tí…", perfectly |
+| `rgba(0,0,0,0.01)` | `(3, 255)` | pet and bubble |
 
-`#ff0000` was the experiment that found it. A solid red root rendered the
-penguin and "Nghỉ tí…" perfectly — which is what finally ruled out the window,
-the Space, the level, the NSPanel conversion, and everything else.
+And `fullscreen.py` went from failing its precondition to passing, with the
+window in the onscreen list 100 % of the time instead of 0–12 %.
 
-The fix is one declaration: `rgba(0, 0, 0, 0.01)`, alpha 3/255, about 1 % black
-over a 420x430 rectangle. Below the threshold of noticing, and the smallest
-value that survives rounding.
+## What killed it
 
-## The symptom I mistook for the cause
+The harness written to catch this class of bug, pointed at the bug. Two binaries
+built once — one transparent, one tinted — and alternated three times each so
+neither could benefit from whatever state the machine was in:
 
-`kCGWindowIsOnscreen` was absent, and the window was in the onscreen list only
-0–12 % of the time. I treated that as the bug and tested six hypotheses against
-it: the saved position, the walk, the NSPanel re-class, the window level,
-applying the collection behaviour before `show()`, and activating the app. All
-six refuted.
+    round 1  transparent  alpha extrema 0, 255   content 9.45%
+    round 1  rgba 0.01    alpha extrema 3, 255   content 9.48%
+    round 2  transparent  alpha extrema 0, 255   content 9.45%
+    round 2  rgba 0.01    alpha extrema 3, 255   content 9.87%
+    round 3  transparent  alpha extrema 0, 255   content 9.45%
+    round 3  rgba 0.01    alpha extrema 3, 255   content 9.48%
 
-After the fix, the same measurement reads **100 %**. The window server does not
-count a window whose layer has nothing composited in it. *Not onscreen* was
-downstream of *nothing painted* the entire time, and I had the arrow backwards
-for a day.
+**The transparent build paints.** Consistently, every round. So the tint was
+never the fix, the mechanism I wrote into a code comment does not exist, and the
+`(0, 0)` reading came from something else that has since stopped happening.
 
-## Three instruments, three artefacts
+The tint and the test enforcing it are reverted. A one per cent tint over the
+user's screen is a small cost; a false explanation with a test defending it is
+not, because the next person to look would start from a wrong premise.
 
-Every measurement I took from outside the process was wrong in its own way, and
-each one produced a confident false conclusion before it was caught.
+## The same error, three times in one day
 
-**`screencapture` only sees the active Space.** So a full-screen capture of a
-window on another Space looks exactly like a window that draws nothing.
+1. **The saved position.** Two runs correlated. Six alternating runs did not.
+2. **The walk.** 13 % against 99 % looked decisive. Re-measured on a correctly
+   bundled build: 76 % against 19 %.
+3. **The transparent root.** One before, one after, plus a red-background
+   experiment that genuinely did change the picture — and I shipped it.
 
-**A differential screenshot needs a static background.** Diffing against a live
-terminal measured the terminal: the control rectangle changed *more* than the
-pet's, 11.7 % against 7.1 %, which is the control correctly announcing that the
-measurement was meaningless. `fullscreen.py` works only because TextEdit holds
-still.
+Each time the pattern was: change one thing, observe an improvement, stop. The
+discipline that catches it is cheap and I know it — alternate the variants, more
+than twice, and build both once so a rebuild cannot be the hidden variable. I
+applied it correctly to the *bisect* earlier the same day and then did not apply
+it to my own fix.
 
-**Reading the window rect then screenshotting races the walk**, which moves the
-window every 900 ms — so the crop can land where the window used to be.
+## What is actually known
 
-And the AppKit reads I added to replace them had an artefact too: `occlusion`
-returned `0x2000` for our window *and* for both `NSStatusBarWindow`s, which are
-plainly working. `isOnActiveSpace` was `false` for those as well. Enumerating
-every window the app owns was what exposed it — two known-good windows in the
-same process, read the same way, giving the same meaningless answer. That
-control should have existed before any of those readings was believed.
+* The pet was invisible: `(0, 0)`, zero painted pixels, confirmed by eye.
+* It is visible now, with the transparent root, at ~9.5 % content.
+* The onscreen duty cycle went 0–12 % → 100 %, and `isOnActiveSpace` went
+  `false` → `true`, without any code change that explains it.
+* Nothing in the codebase is known to cause or fix it.
 
-## The test, which first could not fail
+`kCGWindowIsOnscreen` being absent is very likely still a *symptom* rather than a
+cause — the window server does not count a window whose layer has nothing
+composited — but that direction is now an inference, not a measurement.
 
-The guard is a stylesheet assertion, because jsdom composites nothing. Its first
-version matched the *comment* explaining the rule — the comment contains
-`background: rgba(0,0,0,0.01)` as example text — so it passed with the real
-declaration deleted. A test satisfied by its own documentation is worse than no
-test. It now strips comments before matching, and fails both ways: declaration
-removed, and alpha raised to something a user would see.
+## What came out of it that is worth keeping
 
-## What this cost, and what it is worth
+**`tools/layout/paints.py`.** Capture the window by id and assert on its alpha
+channel. `screencapture -l` returns the window's own contents, so it does not
+care which Space is active, what is behind the window, whether anything is
+animating, or whether the window server calls it onscreen — the four artefacts
+that made every other measurement here unreliable. It runs in about twenty
+seconds and it is the only check that would have failed during the outage.
 
-Six refuted hypotheses, two claims built on two coincidences each, one macOS
-change committed and reverted, and a build measured against a binary that had no
-frontend in it because `cargo build --release` loads `devUrl` — a trap this
-repository already warns about in a comment.
+It also catches the wrong fix. An opaque root reports `alpha extrema 255, 255`
+and 100 % content, and fails on both counts: a filled block is not a pet, and an
+opaque overlay is worse than an invisible one.
 
-The finding underneath all of it: **a null result about a payload or a pixel
-deserves the same suspicion as a null result about a test.** The first question
-is never "why is it broken", it is "is the instrument pointed at the thing".
+`check.py` is the cautionary case: it reads the bubble's geometry out of the
+webview and reported a tidy `208x37 at 106,231` throughout, because WebKit
+computes layout whether or not it paints. A green harness measuring the wrong
+layer is worse than no harness.
+
+## The lesson, stated plainly
+
+A null result about a payload or a pixel deserves the same suspicion as a null
+result about a test: the first question is not "why is it broken", it is "is the
+instrument pointed at the thing". And its twin, which cost more today — **a
+positive result after a change deserves the same suspicion.** One before and one
+after is not evidence. Alternate, repeatedly, with the variants built in advance.
