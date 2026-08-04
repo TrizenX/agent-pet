@@ -29,8 +29,15 @@ jobs:
       - run: node scripts/generate-hooks-json.mjs --check
 
   spike-tools:
-    # The Spike D scripts are the source of truth for the atlas layout; keep
-    # them at least importable so they do not rot between milestones.
+    # Every harness under tools/, compiled. The job used to check two Spike D
+    # scripts, with a comment saying the point was to stop them rotting between
+    # milestones — which is just as true of the invariant suite, the layout
+    # checks, the load smoke and the soak, none of which were covered. A syntax
+    # error in a harness nobody has run this month would otherwise surface the
+    # next time someone needed it, which is the worst moment.
+    #
+    # `py_compile` does not execute imports, so the macOS-only ones (Quartz,
+    # pyobjc) are checked here too.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -38,9 +45,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install Pillow
-      - run: |
-          python3 -m py_compile tools/spike-atlas/derive_atlas.py
-          python3 -m py_compile tools/spike-atlas/verify_rows.py
+      - name: Compile every tool
+        run: |
+          found=$(find tools -name '*.py' -not -path '*/__pycache__/*' | sort)
+          test -n "$found" || { echo "no tools found — this check would pass vacuously"; exit 1; }
+          echo "$found" | sed 's/^/  /'
+          echo "$found" | xargs -n1 python3 -m py_compile
 
   rust:
     runs-on: macos-latest
