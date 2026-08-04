@@ -103,6 +103,32 @@ def is_fullscreen(app: str = "TextEdit") -> bool:
     return False
 
 
+def wait_for_window(timeout: float = 25.0) -> tuple[dict | None, float]:
+    """Poll for our window, and report how much of the time it was onscreen.
+
+    `our_window()` peeked once. TZX-97: the window turns out to be in the
+    onscreen list only a minority of the time, so a single check is a coin flip
+    — and this harness lost it three times running while reporting "not in the
+    window list at all", which reads as *never* rather than *not just now*.
+
+    The duty cycle is the finding, so it is returned rather than hidden: a pet
+    that is onscreen 12 % of the time passes a one-shot check roughly one run in
+    eight, which is how a broken overlay could have shipped behind a green
+    harness.
+    """
+    end = time.time() + timeout
+    seen = samples = 0
+    found: dict | None = None
+    while time.time() < end:
+        w = our_window()
+        samples += 1
+        if w:
+            seen += 1
+            found = found or w
+        time.sleep(0.3)
+    return found, (seen / samples if samples else 0.0)
+
+
 def our_window() -> dict | None:
     """What the window server thinks of our window, right now."""
     infos = Quartz.CGWindowListCopyWindowInfo(
@@ -163,11 +189,18 @@ def main() -> int:
         )
         time.sleep(1.0)
 
-        before = our_window()
+        before, duty = wait_for_window()
         if not before:
-            print("the pet's window is not in the window list at all")
+            print("the pet's window never entered the onscreen list in 25 s")
             return 1
-        print(f"on the desktop:      layer {before['layer']}, onscreen {before['onscreen']}")
+        print(
+            f"on the desktop:      layer {before['layer']}, onscreen {before['onscreen']}, "
+            f"in the onscreen list {duty:.0%} of the time"
+        )
+        if duty < 0.9:
+            # Not a pass and not this harness's job to explain: an overlay that
+            # blinks is a broken overlay even if a screenshot catches it lit.
+            print(f"  -> the window is onscreen only {duty:.0%} of the time (TZX-97)")
 
         # A real full-screen Space, which is the case that breaks naive
         # always-on-top windows — not a borderless window we sized ourselves.
