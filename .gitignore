@@ -30,3 +30,8 @@ __pycache__/
 
 # Scratch for the layout harnesses: screenshots and the probe document.
 /artifacts/layout/
+
+# Soak output: JSONL samples and any frame captured at a moment the pet was not
+# painting. Kept locally as TZX-97 evidence, not committed — a run is megabytes
+# of screenshots and is specific to one machine on one night.
+artifacts/soak/
