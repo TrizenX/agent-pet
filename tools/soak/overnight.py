@@ -53,24 +53,30 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "invariants"))
 from verify import cpu_and_rss, process_tree  # noqa: E402
 
-PORT = 48240
+# The port the hooks already use. An earlier run took 48240 to stay out of the
+# way, which meant the operator's hooks pointed at a dead 48200 for forty minutes
+# and every tool call in their session printed two connection errors. A
+# measurement tool that takes a different port does not avoid the integration, it
+# removes it — and the pet is more interesting to measure while something real is
+# driving it anyway.
+DEFAULT_PORT = 48200
 SOURCE = "claude-code"
 # Alpha at or below this is not content. Matches tools/layout/paints.py.
 BACKDROP = 8
 
 
-def post(body: dict, timeout: float = 3.0) -> None:
+def post(port: int, body: dict, timeout: float = 3.0) -> None:
     req = urllib.request.Request(
-        f"http://127.0.0.1:{PORT}/event/{SOURCE}",
+        f"http://127.0.0.1:{port}/event/{SOURCE}",
         data=json.dumps(body).encode(),
         headers={"content-type": "application/json"},
     )
     urllib.request.urlopen(req, timeout=timeout).read()
 
 
-def health(timeout: float = 3.0) -> dict | None:
+def health(port: int, timeout: float = 3.0) -> dict | None:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=timeout) as r:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout) as r:
             return json.load(r)
     except Exception:
         return None
@@ -159,6 +165,12 @@ def summarise(path: Path, hours: float) -> int:
     # looked at sample rows. A soak that can pass while its subject is dead is
     # not a soak.
     died = [r for r in rows if r.get("kind") == "died"]
+    for d in died:
+        print(
+            f"\nthe pet stopped answering after {d['after_seconds'] / 60:.1f} min "
+            f"({d['sessions']} sessions): {d['error']}"
+        )
+        print(f"  its own output: {path.parent / 'pet.log'}")
     if len(samples) < 4:
         print(f"\nonly {len(samples)} samples — this is not a result")
         return 1
@@ -185,11 +197,20 @@ def summarise(path: Path, hours: float) -> int:
     print(f"sessions    peak {max_sessions}")
     print(f"events      {dropped} dropped")
     print(f"webview     {len(disconnects)} sample(s) with no connection")
+    fp = next((r for r in rows if r.get("kind") == "first_paint"), None)
+    if fp:
+        print(
+            f"first paint  {fp['seconds']:.1f} s after the webview connected"
+            if fp.get("seconds") is not None
+            else "first paint  never — the pet did not paint during warm-up"
+        )
     hiccups = [r for r in rows if r.get("kind") == "hiccup"]
     if hiccups:
         print(f"hiccups     {len(hiccups)} slow request(s), pet alive each time")
 
     problems = []
+    if fp and fp.get("seconds") is None:
+        problems.append("the pet never painted a frame at all — TZX-97, from startup")
     for d in died:
         problems.append(
             f"the pet stopped answering after {d['after_seconds'] / 60:.1f} min "
@@ -235,24 +256,32 @@ def main() -> int:
     ap.add_argument("--binary", required=True)
     ap.add_argument("--hours", type=float, default=8.0)
     ap.add_argument("--sample-seconds", type=float, default=120.0)
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
+    ap.add_argument(
+        "--warmup",
+        type=float,
+        default=45.0,
+        help="seconds to allow for the first painted frame before sampling starts",
+    )
     ap.add_argument("--out", default="artifacts/soak")
     args = ap.parse_args()
 
     binary = Path(args.binary).resolve()
     if not binary.exists():
         raise SystemExit(f"{binary} does not exist — `pnpm tauri build --no-bundle` first")
-    if health():
-        raise SystemExit(f"something is already listening on {PORT}; stop it first")
+    if health(args.port):
+        raise SystemExit(f"something is already listening on {args.port}; stop it first")
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     log = out / "samples.jsonl"
 
+    pet_log = (out / "pet.log").open("w", buffering=1)
     proc = subprocess.Popen(
         [str(binary)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env={**os.environ, "PET_PORT": str(PORT)},
+        stdout=pet_log,
+        stderr=subprocess.STDOUT,
+        env={**os.environ, "PET_PORT": str(args.port)},
     )
     started = time.time()
     fh = log.open("w", buffering=1)  # line buffered: a killed run keeps its data
@@ -264,7 +293,7 @@ def main() -> int:
 
     try:
         for _ in range(120):
-            h = health()
+            h = health(args.port)
             if h and h["webview"]["connected"]:
                 break
             if proc.poll() is not None:
@@ -274,7 +303,33 @@ def main() -> int:
             raise SystemExit("the pet never reported a connected webview")
 
         record({"kind": "start", "t": started, "hours": args.hours, "binary": str(binary)})
-        print(f"pet up on {PORT}; {args.hours} h, sampling every {args.sample_seconds:.0f} s")
+        print(f"pet up on {args.port}; {args.hours} h, sampling every {args.sample_seconds:.0f} s")
+        print("your own sessions reach this pet too — their events are in the counts")
+
+        # Time to first painted frame, measured rather than assumed.
+        #
+        # `report_ready` fires when the webview's adapter registry is up, which is
+        # before anything has been composited — so the first sample used to land on
+        # an empty window and report a TZX-97 hit on every single run. A tool that
+        # cries wolf at t+0 every time trains you to ignore the one signal it exists
+        # to produce, which is worse than not having it.
+        #
+        # So this waits for the first paint and records how long it took. A blind
+        # sleep would hide a pet that never paints at all; this reports it.
+        paint_started = time.time()
+        first_paint = None
+        while time.time() - paint_started < args.warmup:
+            v = visibility(out, "warmup")
+            if v.get("painting"):
+                first_paint = time.time() - paint_started
+                break
+            time.sleep(2)
+        record({"kind": "first_paint", "t": time.time(), "seconds": first_paint})
+        print(
+            f"  first painted frame after {first_paint:.1f} s"
+            if first_paint is not None
+            else f"  NOTHING PAINTED in {args.warmup:.0f} s — TZX-97 from the very start"
+        )
         print(f"samples -> {log}\n")
 
         end = started + args.hours * 3600
@@ -303,7 +358,7 @@ def main() -> int:
                     },
                     {"hook_event_name": "Stop", "session_id": sid, "cwd": cwd},
                 ):
-                    post(body)
+                    post(args.port, body)
             except Exception as e:
                 elapsed = time.time() - started
                 # One slow POST is not a death, and the difference matters.
@@ -316,7 +371,7 @@ def main() -> int:
                 # So ask /health, which is the question that distinguishes them.
                 # An instrument that cannot tell "I disturbed it" from "it died"
                 # will report the wrong bug for eight hours.
-                alive = health(timeout=8.0)
+                alive = health(args.port, timeout=8.0)
                 if alive:
                     record(
                         {
@@ -347,7 +402,7 @@ def main() -> int:
             if time.time() >= next_sample:
                 next_sample = time.time() + args.sample_seconds
                 stamp = time.strftime("%H%M%S")
-                h = health() or {}
+                h = health(args.port) or {}
                 # Re-read: WebKit's helper processes come and go, and a tree
                 # captured once slowly stops describing the app.
                 _, rss = cpu_and_rss(process_tree(proc.pid))
@@ -378,6 +433,7 @@ def main() -> int:
     finally:
         record({"kind": "end", "t": time.time()})
         fh.close()
+        pet_log.close()
         proc.terminate()
         try:
             proc.wait(timeout=5)
