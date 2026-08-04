@@ -9,7 +9,7 @@
       "name": "agent-pet",
       "source": "./packages/adapter-claude-code/plugin",
       "description": "Makes the Agent Pet desktop companion react to what this session is doing. This is the wiring only \u2014 the pet itself is a desktop app you build and run (see the plugin README); without it the hooks are harmless and nothing appears. Run /agent-pet:doctor to see which half is missing.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "TrizenX"
       },

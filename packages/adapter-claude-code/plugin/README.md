@@ -51,9 +51,31 @@ timeout, and the pet answers `204` with an empty body — a hook response body c
 tool call, so the pet's server has no code path that reads the request or produces a
 decision (spec invariant I1).
 
-If the pet is not running, the connection is refused instantly on loopback and the hook
-costs nothing measurable. Measured round-trip with the pet running: **0.16 ms**; with it killed, 0.11 ms to be
+Measured round-trip with the pet running: **0.16 ms**; with it killed, 0.11 ms to be
 refused. (An earlier 0.21 ms figure was `curl` startup, not the endpoint.)
+
+## Install the pet first, or your session fills with errors
+
+This used to say that with the pet not running "the hook costs nothing measurable",
+which is true of the latency and false about everything you would actually notice.
+Claude Code prints a line for every hook it cannot reach:
+
+```
+PreToolUse:Bash hook error
+connect ECONNREFUSED 127.0.0.1:48200
+PostToolUse:Bash hook error
+connect ECONNREFUSED 127.0.0.1:48200
+```
+
+**Two lines per tool call**, and there is no way to silence them from here — the
+message comes from Claude Code, not from this plugin. So the plugin is cheap in
+CPU and expensive in noise, and installing it before the pet exists is the worst
+order to do things in.
+
+If you are already in that state, either start the pet or disable the plugin
+(`/plugin`); the errors stop immediately either way. Nothing is broken and no tool
+call failed — a hook that cannot connect does not block anything (I1) — but you
+should not have to read that twice per command to find out.
 
 ## Moving the port
 

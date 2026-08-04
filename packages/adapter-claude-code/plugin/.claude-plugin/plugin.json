@@ -1,6 +1,6 @@
 {
   "name": "agent-pet",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Drives the Agent Pet desktop companion from Claude Code hooks.",
   "author": {
     "name": "TrizenX",

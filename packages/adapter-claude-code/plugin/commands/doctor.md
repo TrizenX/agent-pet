@@ -9,8 +9,15 @@ installed, or they point at a port nothing is listening on. None of them produce
 anywhere — the pet simply never reacts. Diagnose each one and say which it is.
 
 **The plugin does not contain the pet.** It only installs hooks. Somebody who installed the
-plugin and saw nothing happen has almost certainly not built the app yet, and that is the
+plugin and saw nothing happen has almost certainly not got the app yet, and that is the
 first thing to check, not the last.
+
+**If they are seeing `hook error` / `ECONNREFUSED 127.0.0.1:48200` on every tool call, that
+is the same problem and it is the whole answer.** The hooks are installed and there is no
+pet at the other end. Claude Code prints that line itself and it cannot be suppressed from
+our side, so the only fixes are to start the pet or disable the plugin. Say which they want;
+do not investigate further, and do not let it look like something failed — a hook that
+cannot connect blocks nothing (I1).
 
 ## Steps
 
