@@ -8,9 +8,11 @@
     {
       "name": "agent-pet",
       "source": "./packages/adapter-claude-code/plugin",
-      "description": "Makes the Agent Pet desktop companion react to what this session is doing. Sends hook events to a local endpoint; if the pet is not running, every hook is refused instantly and nothing changes.",
-      "version": "0.1.0",
-      "author": { "name": "TrizenX" },
+      "description": "Makes the Agent Pet desktop companion react to what this session is doing. This is the wiring only \u2014 the pet itself is a desktop app you build and run (see the plugin README); without it the hooks are harmless and nothing appears. Run /agent-pet:doctor to see which half is missing.",
+      "version": "0.2.0",
+      "author": {
+        "name": "TrizenX"
+      },
       "category": "productivity",
       "keywords": ["desktop", "status", "companion"]
     }
