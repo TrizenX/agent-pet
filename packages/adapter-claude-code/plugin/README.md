@@ -1,11 +1,36 @@
 # agent-pet plugin
 
-Points this session's hooks at a locally running Agent Pet.
+**This plugin is half the install.** It wires your session's hooks to a pet; it does not
+contain the pet. On its own it does nothing at all — and it does nothing *silently*, which
+is why this is the first thing written here rather than a footnote.
+
+The pet is a desktop app you run. There is no signed release yet, so you build it once:
+
+```sh
+git clone https://github.com/TrizenX/agent-pet && cd agent-pet
+corepack enable && pnpm install
+pnpm --filter @agent-pet/pet-core tauri build --no-bundle
+./packages/pet-core/src-tauri/target/release/agent-pet &
+```
+
+You need [Rust](https://rustup.rs) and Node 20+. It takes a few minutes the first time.
+
+> `cargo build --release` on its own is **not** enough. Tauri decides dev-versus-production
+> from how `tauri-build` was invoked, not from the cargo profile, so that binary tries to
+> load a dev server nobody started and shows an empty window. Use the command above.
+
+## Is it working?
 
 ```
-/plugin marketplace add TrizenX/agent-pet
-/plugin install agent-pet@trizenx
+/agent-pet:doctor
 ```
+
+That answers the only three questions that matter — is the pet running, are the hooks
+installed, and do they point at the port the pet is actually on — because all three fail
+the same way: the pet never reacts, with no error anywhere.
+
+If you would rather not build anything yet, that is a fine place to stop. The hooks are
+harmless without the pet (below); you just will not see a pet.
 
 ## What it does to your session
 
@@ -30,3 +55,10 @@ node packages/adapter-claude-code/src/cli.ts doctor --port 49000
 The pet refuses to start on a busy port rather than quietly choosing another one, for the
 same reason: hooks point at a URL, and a silent move is a pet that stops reacting with no
 error anywhere.
+
+## Platforms
+
+macOS and Windows. Linux works under X11 and **not** under Wayland: a Wayland client
+cannot position its own window or stay above other windows, so the pet would sit in the
+top-left corner behind your editor. The app says so on stderr at startup rather than
+pretending — [why](https://github.com/TrizenX/agent-pet/blob/main/artifacts/spike-e/FINDINGS.md).
