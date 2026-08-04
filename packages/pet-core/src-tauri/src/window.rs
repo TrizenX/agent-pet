@@ -201,11 +201,88 @@ mod macos {
             let _: () = msg_send![ns_window, orderFrontRegardless];
         }
 
+        if std::env::var("PET_WINDOW_TRACE").as_deref() == Ok("1") {
+            report(window, "after orderFrontRegardless");
+        }
+        trace(window);
+
         observe_space_changes(ns_window as usize, behaviour, level);
 
         println!(
             "[window] macOS overlay applied (nspanel={panel}, collectionBehavior={behaviour:#x}, level={level})"
         );
+    }
+
+    /// Sample the window's state over time, when `PET_WINDOW_TRACE=1`.
+    ///
+    /// A single reading cannot tell a startup race from a permanent condition,
+    /// and this project has now twice mistaken one sample for a cause. Off by
+    /// default because an overlay must cost nothing when idle (I6).
+    pub fn trace(window: &WebviewWindow) {
+        if std::env::var("PET_WINDOW_TRACE").as_deref() != Ok("1") {
+            return;
+        }
+        let win = window.clone();
+        std::thread::spawn(move || {
+            for i in 0..12 {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                let w = win.clone();
+                let label = format!("t+{}s", (i + 1) * 3);
+                // AppKit is main-thread only, and reading these off it returns
+                // stale nonsense rather than failing loudly.
+                let _ = win.run_on_main_thread(move || report(&w, &label));
+            }
+        });
+    }
+
+    /// What AppKit thinks of our window, in its own words.
+    ///
+    /// TZX-97: the window sits in `CGWindowListOptionAll` at level 25 with
+    /// correct bounds and never appears in `kCGWindowListOptionOnScreenOnly`,
+    /// and cropping its exact rectangle out of a screenshot shows only what is
+    /// behind it. Every hypothesis about *why* was checked from outside the
+    /// process and every one of them was wrong — twice I read two coincidences
+    /// as a cause.
+    ///
+    /// So this asks the object. `screen` is the interesting one: AppKit returns
+    /// nil for a window it does not consider to be on any display, which
+    /// distinguishes "ordered out" from "on screen but not composited" — two
+    /// very different bugs that look identical from the window server's side.
+    pub fn report(window: &WebviewWindow, when: &str) {
+        let Ok(ptr) = window.ns_window() else { return };
+        let ns_window = ptr as *mut Object;
+        if ns_window.is_null() {
+            return;
+        }
+        unsafe {
+            let visible: bool = msg_send![ns_window, isVisible];
+            let on_active_space: bool = msg_send![ns_window, isOnActiveSpace];
+            let occlusion: u64 = msg_send![ns_window, occlusionState];
+            let alpha: f64 = msg_send![ns_window, alphaValue];
+            let screen: *mut Object = msg_send![ns_window, screen];
+            let level: i64 = msg_send![ns_window, level];
+            let miniaturized: bool = msg_send![ns_window, isMiniaturized];
+            // Read back rather than trust the write. `setCollectionBehavior:`
+            // silently drops bits AppKit considers invalid for the window's
+            // class or style, and the whole question is whether
+            // canJoinAllSpaces (0x1) actually took.
+            let behaviour: u64 = msg_send![ns_window, collectionBehavior];
+            let style: u64 = msg_send![ns_window, styleMask];
+            let floating: bool = msg_send![ns_window, isFloatingPanel];
+
+            let app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+            let hidden: bool = msg_send![app, isHidden];
+            let active: bool = msg_send![app, isActive];
+            let policy: i64 = msg_send![app, activationPolicy];
+
+            println!(
+                "[window] {when}: visible={visible} screen={} onActiveSpace={on_active_space} \
+                 occlusion={occlusion:#x} alpha={alpha} level={level} miniaturized={miniaturized} \
+                 behaviour={behaviour:#x} styleMask={style:#x} floatingPanel={floating} \
+                 app(hidden={hidden} active={active} activationPolicy={policy})",
+                if screen.is_null() { "nil" } else { "yes" }
+            );
+        }
     }
 
     unsafe fn ns_string(s: &str) -> *mut Object {
