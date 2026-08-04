@@ -17,7 +17,11 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/**/*.test.ts", "packages/**/*.test.tsx"],
+    // `tests/` is for tests that legitimately span packages. A test that drives
+    // recorded Claude Code payloads through pet-core's machine knows both sides,
+    // and neither package may: I5 forbids agent names inside pet-core, and an
+    // adapter must not depend on the shell. So it lives outside both.
+    include: ["packages/**/*.test.ts", "packages/**/*.test.tsx", "tests/**/*.test.ts"],
     environment: "node",
   },
 });

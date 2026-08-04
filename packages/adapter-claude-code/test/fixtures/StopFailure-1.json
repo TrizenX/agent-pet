@@ -7,6 +7,6 @@
     "level": "<redacted:string:4>"
   },
   "hook_event_name": "StopFailure",
-  "error": "<redacted:string:21>",
+  "error": "authentication_failed",
   "last_assistant_message": "<redacted:string:33>"
 }

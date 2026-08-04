@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@agent-pet/protocol": ["../packages/protocol/src/index.ts"],
+      "@agent-pet/adapter-claude-code/mapping": ["../packages/adapter-claude-code/src/mapping.ts"],
+      "@agent-pet/adapter-git/mapping": ["../packages/adapter-git/src/mapping.ts"]
+    }
+  },
+  "include": ["**/*.ts", "../packages/pet-core/src/**/*.ts"]
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldWrite } from "../src/record.ts";
+import { redact, shouldWrite } from "../src/record.ts";
 
 /**
  * The recorder's write rules.
@@ -65,5 +65,55 @@ describe("shouldWrite", () => {
       expect(v.write).toBe(false);
       expect(v.reason).toBeTruthy();
     }
+  });
+});
+
+/**
+ * Redaction has to hide prose and keep enums, and `error` is both depending on
+ * which hook it came from. These are the real strings from real payloads.
+ */
+describe("redact", () => {
+  it("keeps an enum-shaped error, because that is the reason the pet reports", () => {
+    // The actual value from the first StopFailure ever recorded. Redacting it to
+    // <redacted:string:21> is how nobody noticed the mapping read error_type,
+    // a field the payload does not have.
+    expect(redact("authentication_failed", "error")).toBe("authentication_failed");
+    expect(redact("rate_limit", "error")).toBe("rate_limit");
+  });
+
+  it("still hides an error that is prose", () => {
+    // PostToolUseFailure's `error` is a tool's message and can carry paths.
+    expect(redact("Error: /Users/hello/secret.ts failed to parse", "error")).toMatch(
+      /^<redacted:string:\d+>$/,
+    );
+    expect(redact("Command timed out", "error")).toMatch(/^<redacted:string:\d+>$/);
+    // Capitals alone are enough to disqualify it — an enum here is lower snake.
+    expect(redact("Authentication_Failed", "error")).toMatch(/^<redacted:string:\d+>$/);
+  });
+
+  it("does not let the enum rule leak to arbitrary fields", () => {
+    expect(redact("authentication_failed", "last_assistant_message")).toMatch(
+      /^<redacted:string:\d+>$/,
+    );
+  });
+
+  it("replaces identifying fields with stable placeholders", () => {
+    expect(redact("/Users/hello/Project/secret", "cwd")).toBe("/home/user/demo-project");
+    expect(redact("dd7d858f-3920-437e-8c92-9ab2c68c50c0", "session_id")).toBe("session-0000");
+  });
+
+  it("walks nested objects and arrays", () => {
+    const out = redact({
+      hook_event_name: "StopFailure",
+      error: "rate_limit",
+      effort: { level: "high" },
+      permission_suggestions: [{ ruleContent: "rm -rf /Users/hello" }],
+    }) as Record<string, unknown>;
+    expect(out.hook_event_name).toBe("StopFailure");
+    expect(out.error).toBe("rate_limit");
+    // `level` is enum-like and in the allowlist, so it survives — it says which
+    // effort the blocked turn was running at, and carries nothing personal.
+    expect(out.effort).toEqual({ level: "high" });
+    expect(JSON.stringify(out)).not.toContain("/Users/hello");
   });
 });

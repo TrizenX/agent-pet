@@ -23,6 +23,28 @@ interface RawHook {
   agent_type?: unknown;
   reason?: unknown;
   error_type?: unknown;
+  error?: unknown;
+  permission_suggestions?: unknown;
+}
+
+/**
+ * Whether this `PermissionRequest` is a dialog on someone's screen.
+ *
+ * `permission_suggestions` carries the options the dialog is about to offer —
+ * `setMode`, `addDirectories`, an "always allow this rule" entry. Claude Code
+ * has no reason to compute them for a call it is about to wave through, and
+ * measurement agrees: a prompting call arrives with two of them, an
+ * auto-approved evaluation with an empty array.
+ *
+ * This distinction was previously recorded as impossible. The note said
+ * "`permission_suggestions` is present either way, so this event cannot carry
+ * the meaning on its own" — and presence *is* useless, because the key is there
+ * in both cases. The content is not: it is empty in exactly the case we needed
+ * to exclude. One field, examined one level deeper, instead of the timer this
+ * was heading towards.
+ */
+function isPromptingAHuman(raw: RawHook): boolean {
+  return Array.isArray(raw.permission_suggestions) && raw.permission_suggestions.length > 0;
 }
 
 function basename(cwd: unknown): string | undefined {
@@ -114,27 +136,32 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
       return [{ type: "AGENT_IDLE" }];
 
     /**
-     * Deliberately ignored, and this was a real bug for five milestones.
+     * Only when it is actually a question.
      *
-     * `PermissionRequest` fires when the permission system *evaluates* a tool —
-     * including every call a rule auto-approves. Mapping it to
-     * `APPROVAL_NEEDED` meant the pet asked "May I?" for every bash command in
-     * a normal session, and because it arrives *after* `PreToolUse`, the pet
-     * parked in `waiting_approval` and the working states were never visible at
-     * all. Observed live: an entire session in which the pet reached exactly
-     * three states — asleep, digging, and asking.
+     * `PermissionRequest` fires when the permission system *evaluates* a tool,
+     * which under `acceptEdits` includes calls it waves straight through.
+     * Mapping all of them to `APPROVAL_NEEDED` was a real bug for five
+     * milestones: because this arrives *after* `PreToolUse`, the pet parked in
+     * `waiting_approval` and the working states were never visible at all — one
+     * observed session reached exactly three states, asleep, digging and
+     * asking. Returning `[]` for everything fixed that and introduced the
+     * opposite bug, which took a measured interactive session to find.
      *
-     * Nothing in the payload distinguishes "auto-allowed" from "asking the
-     * user": `permission_mode` is the session's mode, and
-     * `permission_suggestions` is present either way. So this event cannot
-     * carry the meaning on its own.
+     * `PermissionDenied` does not exist. It is registered, and across fifteen
+     * real sessions it never fired once — not for a human pressing Esc at the
+     * dialog, not for a `permissions.deny` rule. So after a refusal there is no
+     * `PostToolUse` either (the tool never ran) and no `Stop`: the pet sat in
+     * `working`, naming the command that had just been refused, until the 300 s
+     * watchdog put it to sleep in front of a user who was sitting right there.
+     * A pet asserting something false is worse than a pet saying nothing.
      *
-     * The signal that actually means a human is being asked is
-     * `Notification` / `permission_prompt`, below — and it is the one that was
-     * already right.
+     * `isPromptingAHuman` is what makes both bugs avoidable at once, and the
+     * two committed fixture shapes are the regression test in each direction.
+     * `Notification` / `permission_prompt` below stays as the other route in;
+     * it does not fire for every dialog, which is why this one is needed.
      */
     case "PermissionRequest":
-      return [];
+      return isPromptingAHuman(raw) ? [{ type: "APPROVAL_NEEDED" }] : [];
     case "PermissionDenied":
       return [{ type: "APPROVAL_RESOLVED", granted: false }];
 
@@ -164,9 +191,31 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
     case "Stop":
       return [{ type: "TURN_END" }];
 
+    /**
+     * The only input to `exhausted`, and for five milestones it could not say
+     * why.
+     *
+     * The reason was read from `error_type`, which the payload does not have.
+     * The first `StopFailure` ever recorded from a real client carries:
+     *
+     *     "error": "authentication_failed",
+     *     "last_assistant_message": "Not logged in · Please run /login"
+     *
+     * `authentication_failed` is a `BLOCK_REASONS` key verbatim. The table was
+     * right about the vocabulary and the lookup was right about the meaning —
+     * the field name was wrong, so every real block resolved to `unknown` and
+     * all eight entries were unreachable. Written from documentation at M0 and
+     * exercised only by payloads we wrote ourselves, which is why the tests
+     * agreed with it.
+     *
+     * `error_type` is still read, second: if it ever appears it is the more
+     * specific name and nothing here has to change again.
+     */
     case "StopFailure": {
-      const key = typeof raw.error_type === "string" ? raw.error_type : "unknown";
-      return [{ type: "AGENT_BLOCKED", reason: BLOCK_REASONS[key] ?? "unknown" }];
+      const named = [raw.error, raw.error_type].find((v) => typeof v === "string") as
+        | string
+        | undefined;
+      return [{ type: "AGENT_BLOCKED", reason: BLOCK_REASONS[named ?? "unknown"] ?? "unknown" }];
     }
 
     default:
