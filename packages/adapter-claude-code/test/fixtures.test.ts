@@ -157,6 +157,39 @@ describe("schema drift — findings from the recording", () => {
       expect(load(f)).toHaveProperty("tool_name");
     }
   });
+
+  /**
+   * The reason `exhausted` cannot say why.
+   *
+   * `BLOCK_REASONS` maps eight upstream strings — rate_limit, overloaded,
+   * billing_error, authentication_failed … — onto the reason the pet reports,
+   * and the mapping looks them up under `raw.error_type`. The first real
+   * `StopFailure` ever recorded does not carry `error_type`. It carries
+   * `error`, free text.
+   *
+   * So every genuine block resolves to "unknown" and the whole table is
+   * unreachable. Written from documentation, exercised only by payloads we
+   * wrote ourselves, and wrong since M0 — for the state §7.1 calls the
+   * highest-value in the product.
+   *
+   * Pinned rather than fixed: what `error` actually contains is still being
+   * captured, and guessing a parse from one redacted sample is how the
+   * `error_type` table got here in the first place.
+   */
+  it("StopFailure has no error_type, so BLOCK_REASONS never matches", () => {
+    const stops = files.filter((f) => f.startsWith("StopFailure-")).map(load);
+    expect(stops.length).toBeGreaterThan(0);
+    for (const raw of stops) {
+      expect(raw, "if error_type ever appears, BLOCK_REASONS can be revived").not.toHaveProperty(
+        "error_type",
+      );
+      expect(raw).toHaveProperty("error");
+      expect(claudeCodeAdapter.toPetEvents(raw, CTX)[0]).toMatchObject({
+        type: "AGENT_BLOCKED",
+        reason: "unknown",
+      });
+    }
+  });
 });
 
 /**
@@ -179,15 +212,24 @@ describe("schema drift — findings from the recording", () => {
 describe("hooks with no recorded fixture", () => {
   const recorded = new Set(files.map((f) => f.replace(/-\d+\.json$/, "")));
 
-  /** hook -> why it has never been captured. Delete the entry with the fixture. */
+  /**
+   * hook -> why it has never been captured. Delete the entry with the fixture.
+   *
+   * These used to read "needs a human at a keyboard". Fifteen real interactive
+   * sessions later — driven under a pty, which is a real session by every
+   * measure the tool applies — three of them are better described as *not
+   * emitted by Claude Code 2.1.220*. Keeping the old wording would have left
+   * the list looking like a to-do when it is really a finding.
+   */
   const UNCAPTURED: Record<string, string> = {
-    SessionStart: "never observed in a headless run; needs an interactive session",
-    PermissionDenied: "requires a human declining a permission prompt",
-    StopFailure:
-      "requires a turn that fails against the API. Manufactured with a local " +
-      "endpoint returning 429 via ANTHROPIC_BASE_URL and it still did not fire " +
-      "headless — see artifacts/real-session/FINDINGS.md",
-    Elicitation: "requires an MCP server that elicits input mid-turn",
+    SessionStart:
+      "does not fire. 15 interactive sessions produced 15 SessionEnd and 0 " +
+      "SessionStart, with both registered side by side in settings.json",
+    PermissionDenied:
+      "does not fire, on either denial path: a human pressing Esc at the " +
+      "dialog, or a permissions.deny rule blocking the tool. 42 " +
+      "PermissionRequest, 0 PermissionDenied",
+    Elicitation: "requires an MCP server that elicits input mid-turn; none configured here",
     ElicitationResult: "same, plus a reply to it",
   };
 
