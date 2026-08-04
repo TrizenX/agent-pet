@@ -1,0 +1,189 @@
+# Build an unsigned macOS .dmg and attach it to a GitHub Release.
+#
+# Unsigned, because signing and notarising need an Apple Developer identity the
+# project does not have. That is a real cost to the person downloading it —
+# Gatekeeper rejects the app outright (`spctl`: "no usable signature") — so the
+# release notes below tell them exactly what to run, and why.
+#
+# The point is to remove the build step. Before this, using the pet meant
+# installing Rust and Node and compiling for several minutes, which is a lot to
+# ask of someone who wanted to see a penguin react to their terminal.
+#
+# Runs only on a `v*` tag, so nothing is ever published by accident:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # Available for a dry run: builds and uploads the artifact to the workflow run
+  # without creating a release.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Rust, with both Mac architectures
+        run: |
+          rustup update stable
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/pet-core/src-tauri
+
+      # The version in tauri.conf.json ends up in the .dmg filename and in the
+      # app's Info.plist. Left at 0.0.0 in the repository on purpose: there is one
+      # source of truth for what a release is called, and it is the tag.
+      - name: Take the version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 - "$VERSION" <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path("packages/pet-core/src-tauri/tauri.conf.json")
+          d = json.loads(p.read_text())
+          d["version"] = sys.argv[1]
+          p.write_text(json.dumps(d, indent=2) + "\n")
+          print("version ->", sys.argv[1])
+          PY
+
+      # Universal, so this works on Intel Macs too. Verified locally:
+      # `lipo -archs` reports `x86_64 arm64`.
+      - name: Build the dmg
+        run: pnpm --filter @agent-pet/pet-core exec tauri build --bundles dmg --target universal-apple-darwin
+
+      - name: Find it, and checksum it
+        id: artifact
+        run: |
+          DMG=$(find packages/pet-core/src-tauri/target/universal-apple-darwin/release/bundle/dmg -name '*.dmg' | head -1)
+          test -n "$DMG" || { echo "no .dmg was produced"; exit 1; }
+          # An unsigned download is worth being able to verify by hand, since
+          # nothing else vouches for it.
+          shasum -a 256 "$DMG" | tee "$DMG.sha256"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+
+      # Proof the thing that was built is the thing that runs. Not a visual
+      # check — CI has no Screen Recording permission, so `tools/layout/paints.py`
+      # cannot run here — but it does catch a bundle that will not launch at all,
+      # which is the failure most likely to reach a download page.
+      - name: Does it start?
+        run: |
+          hdiutil attach "${{ steps.artifact.outputs.dmg }}" -nobrowse -quiet
+          APP="/Volumes/Agent Pet/Agent Pet.app"
+          lipo -archs "$APP/Contents/MacOS/agent-pet"
+
+          # Redirect the app's output and keep its pid. A background child that
+          # inherits the step's stdout holds the log pipe open, and the step then
+          # never finishes even though its work is done — which is exactly how
+          # this hung the first time it was run.
+          PET_PORT=48250 "$APP/Contents/MacOS/agent-pet" >/tmp/pet-ci.log 2>&1 &
+          PET=$!
+          cleanup() {
+            kill "$PET" 2>/dev/null || true
+            wait "$PET" 2>/dev/null || true
+            hdiutil detach "/Volumes/Agent Pet" -quiet 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for i in $(seq 1 60); do
+            if curl -sf --max-time 2 http://127.0.0.1:48250/health >/dev/null; then
+              echo "the app came up and answered /health"
+              curl -s http://127.0.0.1:48250/health; echo
+              # I1: a hook is always answered 204 with an empty body.
+              code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+                http://127.0.0.1:48250/event/claude-code \
+                -H 'content-type: application/json' \
+                -d '{"hook_event_name":"Stop","session_id":"ci","cwd":"/w"}')
+              test "$code" = "204" || { echo "hook answered $code, not 204"; exit 1; }
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the bundled app never answered /health"
+          tail -20 /tmp/pet-ci.log || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-pet-macos-universal
+          path: |
+            ${{ steps.artifact.outputs.dmg }}
+            ${{ steps.artifact.outputs.dmg }}.sha256
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Marked a prerelease deliberately. It is unsigned, and TZX-97 — the
+          # pet occasionally not rendering at all — is open. Calling this stable
+          # would be the kind of claim this project keeps having to retract.
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --prerelease \
+            --notes "$(cat <<'NOTES'
+          macOS, universal (Apple Silicon and Intel). **Unsigned** — see below.
+
+          ## Install
+
+          1. Download the `.dmg`, open it, drag **Agent Pet** to Applications.
+          2. Remove the download quarantine, or macOS will refuse to open it:
+
+             ```sh
+             xattr -dr com.apple.quarantine "/Applications/Agent Pet.app"
+             ```
+
+          3. Open it. A pet appears; it lives in the menu bar from there.
+          4. Point your agent at it:
+
+             ```
+             /plugin marketplace add TrizenX/agent-pet
+             /plugin install agent-pet@trizenx
+             ```
+
+             Then open a **new** session — hooks are read when a session starts.
+
+          ## Why step 2 exists
+
+          There is no Apple Developer identity behind this build, so it is not
+          signed and not notarised. `spctl` reports `no usable signature`, and
+          Gatekeeper blocks quarantined apps that fail assessment. Removing the
+          quarantine attribute is what lets it run.
+
+          That is a real thing to be asked to do, and you should not do it for
+          software you do not trust. Verify the download if you like:
+
+          ```sh
+          shasum -a 256 ~/Downloads/*.dmg
+          ```
+
+          and compare against the `.sha256` attached here. Or build from source
+          instead — the README has the four commands.
+
+          ## Known, and open
+
+          The pet sometimes does not render at all: the window exists at the right
+          size and position, the state machine runs correctly, and nothing appears
+          on screen. Tracked as TZX-97, cause not yet found. If it happens to you,
+          `tools/layout/paints.py` in the repository is the check that detects it,
+          and a run captured while it is happening is worth more than any amount
+          of reasoning about it afterwards.
+          NOTES
+          )" \
+            "${{ steps.artifact.outputs.dmg }}" \
+            "${{ steps.artifact.outputs.dmg }}.sha256"

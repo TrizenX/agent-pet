@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The pet is a tray app, not a document app. Without this the bundle gets a
+       Dock icon and a Cmd-Tab entry, and the overlay it is supposed to be starts
+       behaving like a window someone has to manage. Running the bare binary
+       already reported activationPolicy=1 (accessory); this makes the bundled
+       app agree with it instead of quietly differing. -->
+  <key>LSUIElement</key>
+  <true/>
+</dict>
+</plist>
