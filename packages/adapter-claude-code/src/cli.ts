@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { claudeCodeAdapter } from "./mapping.ts";
+import { claudeCodeAdapter, commandHookConfig } from "./mapping.ts";
 import { startRecorder } from "./record.ts";
 import {
   installedEvents,
@@ -31,8 +31,10 @@ const RECORD_PORT = 48201;
  * in the path that milestone shipped. The drift check only compared the
  * adapter against the plugin file, so this copy was never covered by it.
  */
-function hooksFor(port: number): Record<string, unknown[]> {
-  const text = claudeCodeAdapter.hookConfig?.(ourUrl(port)) ?? "{}";
+function hooksFor(port: number, style: "http" | "command" = "http"): Record<string, unknown[]> {
+  const url = ourUrl(port);
+  const text =
+    style === "command" ? commandHookConfig(url) : (claudeCodeAdapter.hookConfig?.(url) ?? "{}");
   return (JSON.parse(text) as { hooks?: Record<string, unknown[]> }).hooks ?? {};
 }
 
@@ -49,9 +51,24 @@ function portFrom(argv: readonly string[], fallback: number): number {
 
 function cmdInstall(argv: readonly string[]): number {
   const port = portFrom(argv, DEFAULT_PORT);
-  const { backup, events } = installHooks(hooksFor(port), port);
+  // Command hooks exist for one reason: an http hook that cannot connect makes
+  // Claude Code print two lines per tool call, and stopping the pet is an
+  // ordinary thing to do. See commandHookConfig.
+  const style = argv.includes("--command") ? "command" : "http";
+  if (style === "command" && process.platform === "win32") {
+    console.error("--command is POSIX-only: the shell it generates is sh, not powershell.");
+    console.error("A powershell equivalent is untested here, and an untested hook that");
+    console.error("breaks every tool call is worse than the noise it would remove.");
+    return 1;
+  }
+  const { backup, events } = installHooks(hooksFor(port, style), port);
   console.log(`installed ${events.length} hook events into ${SETTINGS_PATH}`);
   console.log(`  endpoint: ${ourUrl(port)}`);
+  console.log(
+    style === "command"
+      ? "  style:    command — silent when the pet is not running"
+      : "  style:    http — prints a hook error per tool call when the pet is down",
+  );
   console.log(backup ? `  backup:   ${backup}` : "  backup:   none (file did not exist)");
   const portArg = port === DEFAULT_PORT ? "" : ` --port ${port}`;
   console.log(`\nRemove with: pet-adapter uninstall${portArg}`);
@@ -209,6 +226,9 @@ export function main(argv: readonly string[]): number | Promise<number> {
       );
       console.error("       pet-adapter record --only A,B         # capture only these hooks");
       console.error("       pet-adapter record --force            # replace fixtures that exist");
+      console.error(
+        "       pet-adapter install --command        # hooks that stay quiet with no pet",
+      );
       return 1;
   }
 }

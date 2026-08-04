@@ -1,8 +1,9 @@
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { claudeCodeAdapter } from "../src/mapping.ts";
+import { claudeCodeAdapter, commandHookConfig } from "../src/mapping.ts";
 import {
   installedEvents,
   installHooks,
@@ -202,5 +203,87 @@ describe("pluginInstalled", () => {
     writeFileSync(file, "nonsense");
     expect(pluginInstalled(file)).toBe(false);
     expect(pluginInstalled(join(dir, "nope.json"))).toBe(false);
+  });
+});
+
+describe("command hooks", () => {
+  const url = ourUrl(48200);
+
+  it("registers for exactly the same events as the http variant", () => {
+    // One list, two renderings. Two lists would drift, which is the whole
+    // reason `scripts/generate-hooks-json.mjs` exists.
+    const http = JSON.parse(claudeCodeAdapter.hookConfig?.(url) ?? "{}").hooks;
+    const cmd = JSON.parse(commandHookConfig(url)).hooks;
+    expect(Object.keys(cmd).sort()).toEqual(Object.keys(http).sort());
+  });
+
+  it("cannot fail, whatever happens to the request", () => {
+    const cmd = JSON.parse(commandHookConfig(url)).hooks.Stop[0].hooks[0];
+    expect(cmd.type).toBe("command");
+    // The point of the whole exercise: exit 0 unconditionally. `|| true` would
+    // only cover a non-zero curl, not a timeout or a 500.
+    expect(cmd.command).toMatch(/;\s*exit 0\s*$/);
+    expect(cmd.command).toContain(url);
+  });
+
+  it("reads stdin before curl runs", () => {
+    // Claude Code writes hook input to stdin and complains `EPIPE error while
+    // writing to hook stdin` if the command closes it early. `curl --data-binary @-`
+    // connects first, so with the pet down it exits before reading anything and
+    // earns exactly that complaint.
+    const cmd = JSON.parse(commandHookConfig(url)).hooks.Stop[0].hooks[0].command;
+    expect(cmd).toMatch(/body=\$\(cat\)/);
+    expect(cmd, "reading stdin through curl reintroduces the EPIPE").not.toContain("@-");
+    expect(cmd.indexOf("body=$(cat)")).toBeLessThan(cmd.indexOf("curl"));
+  });
+
+  it("really does exit 0 with nothing listening — the string, executed", () => {
+    // Everything else here inspects the command as text. This runs it, because
+    // the bug being fixed is a runtime exit code, and a regex saying `exit 0`
+    // would still pass if the shell quoting were wrong enough to fail earlier.
+    //
+    // 48299 has nothing on it, which is exactly the state that made Claude Code
+    // print two error lines per tool call.
+    const cmd = JSON.parse(commandHookConfig(ourUrl(48299))).hooks.Stop[0].hooks[0].command;
+    const r = spawnSync("sh", ["-c", cmd], {
+      input: JSON.stringify({ hook_event_name: "Stop", session_id: "t", cwd: "/w" }),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(r.status, "a non-zero exit is what Claude Code reports as a hook error").toBe(0);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("");
+  });
+
+  it("is recognised by uninstall, or it would be left behind", () => {
+    // isOurs matched only on `url`, which a command hook does not have — so
+    // uninstall walked past them and install duplicated them.
+    const file = join(tmpdir(), `pet-cmd-${Date.now()}.json`);
+    writeFileSync(file, "{}");
+    try {
+      installHooks(JSON.parse(commandHookConfig(url)).hooks, 48200, file);
+      const after = JSON.parse(readFileSync(file, "utf8"));
+      expect(Object.keys(after.hooks).length).toBeGreaterThan(0);
+
+      const { removed } = uninstallHooks(48200, file);
+      expect(removed).toBeGreaterThan(0);
+      expect(JSON.parse(readFileSync(file, "utf8")).hooks).toBeUndefined();
+    } finally {
+      rmSync(file, { force: true });
+    }
+  });
+
+  it("does not duplicate on a second install", () => {
+    const file = join(tmpdir(), `pet-cmd2-${Date.now()}.json`);
+    writeFileSync(file, "{}");
+    try {
+      const hooks = JSON.parse(commandHookConfig(url)).hooks;
+      installHooks(hooks, 48200, file);
+      installHooks(hooks, 48200, file);
+      const after = JSON.parse(readFileSync(file, "utf8"));
+      expect(after.hooks.Stop).toHaveLength(1);
+    } finally {
+      rmSync(file, { force: true });
+    }
   });
 });
