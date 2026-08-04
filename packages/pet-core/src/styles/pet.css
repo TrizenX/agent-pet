@@ -24,6 +24,24 @@ body {
 }
 
 .pet-root {
+  /* Not decoration. Without a background here the pet does not appear at all.
+     A fully transparent page makes WKWebView treat the whole layer as empty and
+     composite none of it, so even the opaque sprite and the dark speech bubble
+     are dropped. Measured, capturing the window by id:
+
+       background: transparent          alpha extrema (0, 0)     nothing at all
+       background: rgba(0,0,0,0.01)     alpha extrema (3, 255)   pet and bubble
+
+     `#ff0000` was the experiment that proved it — a solid root rendered the
+     penguin and "Nghỉ tí…" perfectly, which is what ruled out the window,
+     the Space, the level, the NSPanel conversion and six other suspects.
+
+     0.01 lands on alpha 3/255: about 1 % black over a 420x430 rectangle, which
+     is below the threshold of noticing and is the smallest value that reliably
+     survives rounding. Do not raise it — §9.1 is explicit that anything opaque
+     here is something the user looks past all day. Do not remove it either;
+     there is a test. TZX-97. */
+  background: rgba(0, 0, 0, 0.01);
   position: relative;
   height: 100%;
   display: grid;

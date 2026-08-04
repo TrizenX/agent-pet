@@ -68,3 +68,52 @@ describe("the bubble is allowed to use the room it has", () => {
     expect(rule(".pet-bubble")).toContain("width: max-content");
   });
 });
+
+describe("the pet is composited at all", () => {
+  const css = readFileSync(new URL("./styles/pet.css", import.meta.url), "utf8");
+
+  /**
+   * TZX-97, and the most expensive lesson in the project so far.
+   *
+   * A fully transparent page makes WKWebView composite none of the layer, so
+   * the pet was invisible on screen while `/health` reported a connected
+   * webview, the state machine ran correctly, and the frontend logged a laid-out
+   * speech bubble. Every instrument that looks at the *window* said it was fine,
+   * because it was fine. Six hypotheses died before anyone gave the root a
+   * colour and watched the penguin appear.
+   *
+   * Measured by capturing the window by id: `transparent` gives alpha extrema
+   * (0, 0) — not one painted pixel; `rgba(0,0,0,0.01)` gives (3, 255).
+   *
+   * jsdom composites nothing, so this cannot be a rendering test. Reading the
+   * rule is crude and it is the only check here that can fail — which is the
+   * whole point, because the fix looks exactly like a stray debug style someone
+   * would tidy away.
+   */
+  // Comments stripped first, and that is not fussiness. The rule this guards is
+  // explained by a comment that *contains* `background: rgba(0,0,0,0.01)` as
+  // example text, so the first version of this test matched the explanation
+  // instead of the declaration and passed happily with the real one deleted.
+  // A test whose own documentation satisfies it is worse than no test.
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const rule = bare.slice(
+    bare.indexOf(".pet-root {"),
+    bare.indexOf("}", bare.indexOf(".pet-root {")),
+  );
+
+  it("gives the root a background, or nothing renders", () => {
+    const match = rule.match(/background:\s*rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)/);
+    expect(match, ".pet-root has no rgba background — see TZX-97").not.toBeNull();
+    const alpha = Number(match?.[1]);
+    // Above zero or the layer is dropped; low enough that the user is not
+    // looking through a tinted rectangle all day (§9.1).
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(0.02);
+  });
+
+  it("keeps the window itself transparent — the workaround is in the page", () => {
+    // If someone "fixes" this by making the window opaque, the pet becomes a
+    // grey box over the editor, which is worse than the bug.
+    expect(config.app.windows[0]?.transparent).toBe(true);
+  });
+});

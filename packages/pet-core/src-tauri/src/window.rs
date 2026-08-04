@@ -58,6 +58,35 @@ fn warn_if_wayland() {
 // unexpected. Harmless, and not worth pulling in a heavier bindings crate for.
 #[allow(unexpected_cfgs)]
 mod macos {
+    /// Just enough of CGGeometry to read a frame back. Declared rather than
+    /// pulled in, for the same reason the collection-behaviour bits are named
+    /// locally: the layout is auditable against Apple's headers.
+    mod core_graphics_frame {
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        pub struct CGPoint {
+            pub x: f64,
+            pub y: f64,
+        }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        pub struct CGSize {
+            pub width: f64,
+            pub height: f64,
+        }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        pub struct CGRect {
+            pub origin: CGPoint,
+            pub size: CGSize,
+        }
+        unsafe impl objc::Encode for CGRect {
+            fn encode() -> objc::Encoding {
+                unsafe { objc::Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}") }
+            }
+        }
+    }
+
     use objc::runtime::Object;
     use objc::{class, msg_send, sel, sel_impl};
     use tauri::WebviewWindow;
@@ -203,6 +232,7 @@ mod macos {
 
         if std::env::var("PET_WINDOW_TRACE").as_deref() == Ok("1") {
             report(window, "after orderFrontRegardless");
+            report_all(window);
         }
         trace(window);
 
@@ -211,6 +241,53 @@ mod macos {
         println!(
             "[window] macOS overlay applied (nspanel={panel}, collectionBehavior={behaviour:#x}, level={level})"
         );
+    }
+
+    /// Every NSWindow the application owns, not just the one we styled.
+    ///
+    /// TZX-97: six hypotheses were tested and refuted, and every one of them
+    /// asked the *same* window — the one `ns_window()` hands back. But
+    /// `CGWindowList` shows this process owning two: ours at layer 25, and an
+    /// unnamed 500x500 at layer 0. Nobody had checked which of them the webview
+    /// actually lives in, or whether the overlay behaviour is being applied to
+    /// the right object at all.
+    ///
+    /// It is also the control the earlier readings never had. `occlusion=0x2000`
+    /// is not a legal `NSWindowOcclusionState`, which means either AppKit is
+    /// returning something undocumented or my `msg_send` is wrong — and a second
+    /// window in the same process, read the same way, distinguishes those two.
+    pub fn report_all(window: &WebviewWindow) {
+        unsafe {
+            let app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+            let windows: *mut Object = msg_send![app, windows];
+            let count: usize = msg_send![windows, count];
+            let ours = window.ns_window().map(|p| p as usize).unwrap_or(0);
+            println!("[window] the app owns {count} NSWindow(s):");
+            for i in 0..count {
+                let w: *mut Object = msg_send![windows, objectAtIndex: i];
+                let cls: *const objc::runtime::Class = msg_send![w, class];
+                let name = std::ffi::CStr::from_ptr(objc::runtime::class_getName(cls))
+                    .to_string_lossy()
+                    .into_owned();
+                let visible: bool = msg_send![w, isVisible];
+                let on_space: bool = msg_send![w, isOnActiveSpace];
+                let occ: u64 = msg_send![w, occlusionState];
+                let level: i64 = msg_send![w, level];
+                let alpha: f64 = msg_send![w, alphaValue];
+                let opaque: bool = msg_send![w, isOpaque];
+                let frame: core_graphics_frame::CGRect = msg_send![w, frame];
+                println!(
+                    "[window]   [{i}] {name}{} frame=({},{} {}x{}) level={level} \
+                     visible={visible} onActiveSpace={on_space} occlusion={occ:#x} \
+                     alpha={alpha} opaque={opaque}",
+                    if w as usize == ours { " <- ours" } else { "" },
+                    frame.origin.x as i64,
+                    frame.origin.y as i64,
+                    frame.size.width as i64,
+                    frame.size.height as i64,
+                );
+            }
+        }
     }
 
     /// Sample the window's state over time, when `PET_WINDOW_TRACE=1`.
