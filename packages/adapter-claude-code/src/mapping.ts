@@ -223,6 +223,79 @@ function bodiesFor(raw: RawHook): PetEventBody[] {
   }
 }
 
+/**
+ * The same hooks, as shell commands that fail silently.
+ *
+ * An HTTP hook that cannot connect makes Claude Code print two lines per tool
+ * call — `PreToolUse:Bash hook error` and `connect ECONNREFUSED` — and there is
+ * no way to suppress that from here; the string lives in its binary. So with
+ * the plugin installed and the pet stopped, every command a user runs is
+ * answered with errors. Turning the pet off is a perfectly ordinary thing to
+ * want, and the punishment for it was noise in every session until you also
+ * remembered to disable the plugin somewhere else.
+ *
+ * A command hook can exit 0 whatever happens, so the pet being absent becomes
+ * exactly what it should be: nothing at all.
+ *
+ * Two details, both learned the hard way rather than designed:
+ *
+ * `body=$(cat)` reads the payload **before** curl runs. Claude Code writes hook
+ * input to the command's stdin and logs `EPIPE error while writing to hook
+ * stdin` if the command closes it early — and `curl --data-binary @-` connects
+ * first, so with the pet down it exits before reading anything and earns
+ * exactly that complaint. Reading stdin to completion first costs nothing and
+ * removes the failure mode.
+ *
+ * `; exit 0` rather than `|| true`, because the point is that *nothing* here
+ * can fail: not a refused connection, not a timeout, not a 500.
+ *
+ * D1 chose HTTP over command hooks to avoid a bash/powershell fork, and that
+ * reasoning still holds — which is why this is opt-in and generated at install
+ * time by a CLI that knows what it is running on, rather than baked into the
+ * plugin's static hooks.json.
+ */
+export function commandHookConfig(endpoint: string): string {
+  // Single quotes around the header, double around the body: the body is a
+  // shell variable and must expand, the header must not.
+  const command =
+    `body=$(cat); curl -s -m 2 -X POST ` +
+    `-H 'content-type: application/json' -d "$body" ${endpoint} ` +
+    `>/dev/null 2>&1; exit 0`;
+  const target = { type: "command", command, timeout: 2 };
+  const plain = [{ hooks: [target] }];
+  const matched = [{ matcher: ".*", hooks: [target] }];
+  return JSON.stringify({ hooks: hookEvents(plain, matched) }, null, 2);
+}
+
+/**
+ * Which hooks we register for, and whether each takes a tool matcher.
+ *
+ * One list, called by both `hookConfig` and `commandHookConfig`. Two copies is
+ * precisely the drift `scripts/generate-hooks-json.mjs` was added to catch, and a
+ * hand-written second copy in `cli.ts` slipped past that check once already.
+ */
+function hookEvents<T>(plain: T, matched: T): Record<string, T> {
+  return {
+    SessionStart: plain,
+    SessionEnd: plain,
+    UserPromptSubmit: plain,
+    PreToolUse: matched,
+    PostToolUse: matched,
+    PostToolUseFailure: matched,
+    PermissionRequest: matched,
+    PermissionDenied: matched,
+    Notification: plain,
+    Stop: plain,
+    StopFailure: plain,
+    PreCompact: plain,
+    PostCompact: plain,
+    SubagentStart: matched,
+    SubagentStop: matched,
+    Elicitation: matched,
+    ElicitationResult: matched,
+  };
+}
+
 export const claudeCodeAdapter: PetAdapter = {
   id: ADAPTER_ID,
   label: "Claude Code",
@@ -231,31 +304,7 @@ export const claudeCodeAdapter: PetAdapter = {
     const target = { type: "http", url: endpoint, timeout: 2 };
     const plain = [{ hooks: [target] }];
     const matched = [{ matcher: ".*", hooks: [target] }];
-    return JSON.stringify(
-      {
-        hooks: {
-          SessionStart: plain,
-          SessionEnd: plain,
-          UserPromptSubmit: plain,
-          PreToolUse: matched,
-          PostToolUse: matched,
-          PostToolUseFailure: matched,
-          PermissionRequest: matched,
-          PermissionDenied: matched,
-          Notification: plain,
-          Stop: plain,
-          StopFailure: plain,
-          PreCompact: plain,
-          PostCompact: plain,
-          SubagentStart: matched,
-          SubagentStop: matched,
-          Elicitation: matched,
-          ElicitationResult: matched,
-        },
-      },
-      null,
-      2,
-    );
+    return JSON.stringify({ hooks: hookEvents(plain, matched) }, null, 2);
   },
 
   toPetEvents(rawInput: unknown, ctx: AdapterContext): PetEvent[] {

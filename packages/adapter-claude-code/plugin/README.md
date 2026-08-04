@@ -77,6 +77,23 @@ If you are already in that state, either start the pet or disable the plugin
 call failed — a hook that cannot connect does not block anything (I1) — but you
 should not have to read that twice per command to find out.
 
+### If you stop and start the pet often, use command hooks instead
+
+```sh
+/plugin                                                   # disable agent-pet, then
+node packages/adapter-claude-code/src/cli.ts install --command
+```
+
+Same seventeen events, same endpoint, but each hook is a shell command that exits
+`0` no matter what happens — so with the pet stopped you get *silence*, which is
+what "the hook costs nothing" should have meant all along.
+
+POSIX only. The command it writes is `sh`, and a `powershell` equivalent is
+untested here; an untested hook that breaks every tool call would be worse than
+the noise it removes, so `--command` refuses to run on Windows rather than guess.
+
+Uninstall with `cli.ts uninstall`, which recognises both shapes.
+
 ## Moving the port
 
 The endpoint is baked into the hook URLs, so a non-default `PET_PORT` needs a different

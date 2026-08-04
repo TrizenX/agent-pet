@@ -23,14 +23,24 @@ export function ourUrl(port: number): string {
 
 type Json = Record<string, unknown>;
 
+/**
+ * Whether this entry is one of ours, for the given endpoint.
+ *
+ * Matches both hook shapes. An `http` hook carries the endpoint in `url`; a
+ * `command` hook carries it inside the shell command, and matching only on `url`
+ * meant `uninstall` silently walked past every command hook — leaving them behind
+ * for `install` to duplicate. The endpoint is the identity in both cases, so it
+ * is the thing to look for wherever it appears.
+ */
 function isOurs(entry: unknown, urlPrefix: string): boolean {
   const hooks = (entry as { hooks?: unknown })?.hooks;
   if (!Array.isArray(hooks)) return false;
-  return hooks.some(
-    (h) =>
-      typeof (h as { url?: unknown })?.url === "string" &&
-      (h as { url: string }).url.startsWith(urlPrefix),
-  );
+  return hooks.some((h) => {
+    const url = (h as { url?: unknown })?.url;
+    if (typeof url === "string" && url.startsWith(urlPrefix)) return true;
+    const command = (h as { command?: unknown })?.command;
+    return typeof command === "string" && command.includes(urlPrefix);
+  });
 }
 
 export function backup(path = SETTINGS_PATH): string | null {

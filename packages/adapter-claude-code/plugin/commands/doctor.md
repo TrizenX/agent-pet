@@ -15,9 +15,17 @@ first thing to check, not the last.
 **If they are seeing `hook error` / `ECONNREFUSED 127.0.0.1:48200` on every tool call, that
 is the same problem and it is the whole answer.** The hooks are installed and there is no
 pet at the other end. Claude Code prints that line itself and it cannot be suppressed from
-our side, so the only fixes are to start the pet or disable the plugin. Say which they want;
-do not investigate further, and do not let it look like something failed — a hook that
-cannot connect blocks nothing (I1).
+our side, so the fixes are: start the pet, disable the plugin, or — if they stop and start
+the pet often — reinstall the hooks as commands, which exit 0 whatever happens and are
+therefore silent with no pet:
+
+```sh
+node packages/adapter-claude-code/src/cli.ts install --command
+```
+
+(That is POSIX only, and it refuses on Windows rather than ship an untested powershell
+one-liner.) Say which they want; do not investigate further, and do not let it look like
+something failed — a hook that cannot connect blocks nothing (I1).
 
 ## Steps
 
