@@ -362,3 +362,77 @@ by duration alone. Recorded here rather than guessed at.
 real input, and the same payload shows the reason table feeding it has never
 been able to match. Fixing that needs to know what `error` contains, which is
 one more capture rather than one more guess.
+
+---
+
+# TZX-96: the two fields that were there all along
+
+The denial bug above was written up as needing a decision rather than a patch,
+on this reasoning:
+
+> The only agent-agnostic signal left is time, and a long build is
+> indistinguishable from a refused command by duration alone.
+
+That was wrong, and it was wrong the same way the `error_type` table was wrong:
+a claim about a payload, made without looking closely enough at the payload.
+
+## `permission_suggestions` distinguishes a question from an auto-approval
+
+The mapping's own comment said it could not:
+
+> Nothing in the payload distinguishes "auto-allowed" from "asking the user":
+> `permission_mode` is the session's mode, and `permission_suggestions` is
+> present either way. So this event cannot carry the meaning on its own.
+
+Presence is indeed useless — the key is there both times. **Length is not.**
+
+| | hook sequence | `permission_suggestions` |
+| :-- | :-- | :-- |
+| auto-approved (`acceptEdits`, in-project write + read) | `PreToolUse → PostToolUse → … → Stop` | no `PermissionRequest` at all |
+| auto-approved (`acceptEdits`, evaluated) | `PreToolUse → PermissionRequest → PostToolUse` | `[]` |
+| prompting (`default`, write outside the workspace) | `PreToolUse → PermissionRequest → (dialog)` | `[{setMode}, {addDirectories}]` |
+
+Those are the dialog's own options — "switch mode", "add this directory",
+"always allow this rule". Claude Code has no reason to compute them for a call
+it is about to wave through.
+
+So `PermissionRequest` maps to `APPROVAL_NEEDED` **when and only when it carries
+suggestions**. The pet now says "May I?" while the dialog is up, instead of
+naming the command as though it were running. Both historical bugs are covered
+by one condition, and both committed fixture shapes are the regression test —
+verified by breaking the mapping in each direction and watching the opposite
+test go red.
+
+## `StopFailure.error` is a `BLOCK_REASONS` key verbatim
+
+The redacted fixture read `"error": "<redacted:string:21>"`. Unredacted:
+
+```json
+"error": "authentication_failed",
+"last_assistant_message": "Not logged in · Please run /login"
+```
+
+`authentication_failed` is already in `BLOCK_REASONS`, mapping to `auth`. The
+table was right about the vocabulary and the lookup was right about the meaning.
+Only the field name was wrong — `error`, not `error_type` — and that one
+mismatch made all eight entries unreachable from M0 until now.
+
+**Redaction was hiding the answer.** `error` was replaced along with every other
+free-text value, which is why the first capture proved the field existed and
+told us nothing about it. It is now kept when the value looks like a bare
+lower-snake identifier and still hidden when it is prose — because the same key
+on `PostToolUseFailure` holds a tool's error message, which can contain absolute
+paths. The test is on the value, not the key, so the redactor still needs to
+know nothing about the schema.
+
+## What this says about the method
+
+Three findings in this file were "impossible" until someone read one level
+deeper: `is_error` (documented, absent), `error_type` (expected, actually
+`error`), and `permission_suggestions` (dismissed as present-either-way,
+actually empty-or-not). Each was recorded as a limit of the data rather than a
+limit of the reading.
+
+A null result about a payload deserves the same suspicion as a null result about
+a test: the first question is whether the instrument was pointed at the right
+thing.

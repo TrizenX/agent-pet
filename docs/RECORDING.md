@@ -1,17 +1,17 @@
 # Recording the last five hooks
 
-Twelve of the sixteen hooks in `mapping.ts` have fixtures recorded from a live
-agent. Five do not, and every one of them is missing for the same reason: **a
-headless `claude -p` run does not emit them.** They need a person at a keyboard.
+Thirteen of the sixteen hooks in `mapping.ts` have fixtures recorded from a live
+agent. Three do not, and the reasons differ — two of them are not "yet to be
+captured" but **measured not to fire at all**.
 
 That is a narrower statement than it sounds, and it is measured rather than
 assumed — see [`artifacts/real-session/FINDINGS.md`](../artifacts/real-session/FINDINGS.md).
 
 | Hook | Why it has never been captured |
 | :-- | :-- |
-| `SessionStart` | never observed headless |
-| `PermissionDenied` | needs a human declining a prompt |
-| `StopFailure` | needs a turn that fails against the API |
+| `SessionStart` | **does not fire.** 15 interactive sessions: 15 `SessionEnd`, 0 `SessionStart`, both registered side by side |
+| `PermissionDenied` | **does not fire**, on either path — a human pressing Esc, or a `permissions.deny` rule. 42 `PermissionRequest`, 0 `PermissionDenied` |
+| ~~`StopFailure`~~ | **captured** — see below |
 | `Elicitation` | needs an MCP server that asks for input mid-turn |
 | `ElicitationResult` | same, plus a reply |
 
@@ -64,8 +64,11 @@ why it maps to `[]` — so the denial is the only part that produces a new event
 
 ### `StopFailure` — a server that always fails
 
-The open question. Headless, a real `429` produced no `StopFailure`; the turn
-simply failed and the session ended. Whether interactive differs is unknown.
+**Captured.** The thing that had defeated three previous attempts was patience,
+not access: Claude Code retries every API error **ten times at sixty-second
+intervals**, including a `401`, so a turn does not reach a terminal failure for
+roughly ten minutes. Every earlier run was abandoned inside that window, and
+"no `StopFailure`" meant "no verdict yet".
 
 ```sh
 python3 tools/record/failing-api.py --mode rate_limit
@@ -77,13 +80,13 @@ Then, in another terminal:
 ANTHROPIC_BASE_URL=http://127.0.0.1:48260 claude
 ```
 
-Send one prompt. Every response fails, so nothing else can happen. `--mode auth`
-fails instantly instead of retrying with backoff, which is quicker if all you
-want is the list of hooks that fire.
+Send one prompt, then **wait out the full ten retries** — around twelve minutes.
+`--mode auth` is retried just like `rate_limit`, so it is no faster; pick
+whichever reason you want in the fixture.
 
-**Either outcome is a result.** A fixture, or confirmation that `StopFailure`
-does not exist on this path — in which case `exhausted` is unreachable as
-designed and that needs saying in the spec, not leaving as a TODO.
+The payload it produced carried `"error": "authentication_failed"` — a
+`BLOCK_REASONS` key verbatim, under a field name the mapping was not reading.
+That one mismatch had made all eight entries unreachable since M0.
 
 ### `Elicitation` / `ElicitationResult` — hardest
 

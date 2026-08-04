@@ -280,12 +280,20 @@ export const petMachine = setup({
      * This is the case where the pet is somewhere else entirely, and the only
      * one that matters is `waiting_approval`.
      *
-     * Granting permission produces no event of its own. A denial arrives as
-     * `APPROVAL_RESOLVED`; an approval arrives as nothing at all, and the next
-     * thing the pet hears is the finished tool. So without this it went on
-     * saying "May I?" after the user had already said yes — until the next tool
-     * call or the thirty-minute decay, whichever came first. Reported exactly
-     * that way.
+     * **Neither answer to a permission prompt produces an event of its own.**
+     * An approval arrives as nothing at all, and the next thing the pet hears is
+     * the finished tool — so without this transition it went on saying "May I?"
+     * after the user had already said yes, until the next tool call or the
+     * thirty-minute decay. Reported exactly that way.
+     *
+     * This comment used to claim a denial was different, arriving as
+     * `APPROVAL_RESOLVED`. It is not: measurement across fifteen real
+     * interactive sessions found that event's only upstream source never fires,
+     * so a refusal is followed by silence too — no completion, because the tool
+     * never ran. The pet cannot learn a refusal from anything that reaches this
+     * machine, and the adapter now keeps it honest by putting it in
+     * `waiting_approval` when the question is asked rather than letting
+     * `working` claim progress it cannot see. TZX-96.
      *
      * It was also an I3 violation in plain sight: `waiting_approval` was
      * swallowing an incoming event, which §2 says no state may do.

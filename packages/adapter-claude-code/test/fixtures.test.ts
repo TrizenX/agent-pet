@@ -34,7 +34,7 @@ const EXPECTED: Record<string, string | null> = {
   PreToolUse: "TOOL_START",
   PostToolUse: "TOOL_DONE",
   PostToolUseFailure: "TOOL_DONE",
-  PermissionRequest: null,
+  PermissionRequest: "APPROVAL_NEEDED",
   PermissionDenied: "APPROVAL_RESOLVED",
   Stop: "TURN_END",
   StopFailure: "AGENT_BLOCKED",
@@ -73,6 +73,22 @@ describe("recorded fixtures", () => {
     const raw = load(file);
     const events = claudeCodeAdapter.toPetEvents(raw, CTX);
     const hook = raw.hook_event_name as string;
+
+    if (hook === "PermissionRequest") {
+      // Depends on the payload, not the hook: a dialog on someone's screen
+      // arrives with `permission_suggestions` filled in, an auto-approved
+      // evaluation with an empty array. Both shapes are committed here, which
+      // is what makes this a regression test in both directions at once.
+      const asking =
+        Array.isArray(raw.permission_suggestions) && raw.permission_suggestions.length > 0;
+      if (asking) {
+        expect(events).toHaveLength(1);
+        expect(events[0]?.type).toBe("APPROVAL_NEEDED");
+      } else {
+        expect(events).toEqual([]);
+      }
+      return;
+    }
 
     if (hook === "Notification") {
       // Only some notification types are ours; the rest must be dropped.
@@ -159,35 +175,72 @@ describe("schema drift — findings from the recording", () => {
   });
 
   /**
-   * The reason `exhausted` cannot say why.
+   * `permission_suggestions` tells a dialog from an auto-approval.
    *
-   * `BLOCK_REASONS` maps eight upstream strings — rate_limit, overloaded,
-   * billing_error, authentication_failed … — onto the reason the pet reports,
-   * and the mapping looks them up under `raw.error_type`. The first real
-   * `StopFailure` ever recorded does not carry `error_type`. It carries
-   * `error`, free text.
+   * The note this replaces said the two were indistinguishable — that
+   * `permission_suggestions` "is present either way, so this event cannot carry
+   * the meaning on its own". Presence is indeed useless. Length is not: a
+   * prompting call arrives with the options the dialog is about to offer
+   * (`setMode`, `addDirectories`), an auto-approved evaluation with `[]`.
    *
-   * So every genuine block resolves to "unknown" and the whole table is
-   * unreachable. Written from documentation, exercised only by payloads we
-   * wrote ourselves, and wrong since M0 — for the state §7.1 calls the
-   * highest-value in the product.
-   *
-   * Pinned rather than fixed: what `error` actually contains is still being
-   * captured, and guessing a parse from one redacted sample is how the
-   * `error_type` table got here in the first place.
+   * Both shapes have to stay committed or the branch test above passes without
+   * exercising anything — the failure mode this project keeps rediscovering is
+   * a test that cannot go red.
    */
-  it("StopFailure has no error_type, so BLOCK_REASONS never matches", () => {
+  it("has a recorded PermissionRequest of each shape, or the branch is untested", () => {
+    const reqs = files.filter((f) => f.startsWith("PermissionRequest-")).map(load);
+    const asking = reqs.filter((r) => (r.permission_suggestions ?? []).length > 0);
+    const quiet = reqs.filter((r) => (r.permission_suggestions ?? []).length === 0);
+    expect(asking.length, "no fixture where a human is being asked").toBeGreaterThan(0);
+    expect(quiet.length, "no fixture where the call was auto-approved").toBeGreaterThan(0);
+
+    for (const r of asking) {
+      expect(claudeCodeAdapter.toPetEvents(r, CTX)).toEqual([
+        expect.objectContaining({ type: "APPROVAL_NEEDED" }),
+      ]);
+    }
+    for (const r of quiet) {
+      expect(claudeCodeAdapter.toPetEvents(r, CTX)).toEqual([]);
+    }
+  });
+
+  /**
+   * The reason `exhausted` can finally say why.
+   *
+   * `BLOCK_REASONS` maps eight upstream strings onto the reason the pet
+   * reports, and the mapping looked them up under `raw.error_type`. The first
+   * real `StopFailure` ever recorded has no `error_type`. It carries `error`:
+   *
+   *     "error": "authentication_failed"
+   *     "last_assistant_message": "Not logged in · Please run /login"
+   *
+   * `authentication_failed` is a `BLOCK_REASONS` key verbatim. The table was
+   * right about the vocabulary and the lookup was right about the meaning — the
+   * field name was wrong, so every real block resolved to `unknown` and all
+   * eight entries were unreachable from M0 until now, for the state §7.1 calls
+   * the highest-value in the product.
+   *
+   * Two ways this could regress, so both are asserted: the mapping going back
+   * to `error_type`, and the recorder redacting `error` again. It was hidden as
+   * `<redacted:string:21>` in the first capture, which is exactly why nobody
+   * noticed.
+   */
+  it("StopFailure carries the block reason in `error`, and it resolves", () => {
     const stops = files.filter((f) => f.startsWith("StopFailure-")).map(load);
     expect(stops.length).toBeGreaterThan(0);
     for (const raw of stops) {
-      expect(raw, "if error_type ever appears, BLOCK_REASONS can be revived").not.toHaveProperty(
-        "error_type",
+      expect(raw, "the reason must survive redaction or this proves nothing").toHaveProperty(
+        "error",
       );
-      expect(raw).toHaveProperty("error");
-      expect(claudeCodeAdapter.toPetEvents(raw, CTX)[0]).toMatchObject({
-        type: "AGENT_BLOCKED",
-        reason: "unknown",
-      });
+      expect(raw.error, "redacted again — see KEEP_IF_ENUMLIKE in record.ts").not.toMatch(
+        /^<redacted:/,
+      );
+      const [event] = claudeCodeAdapter.toPetEvents(raw, CTX);
+      expect(event).toMatchObject({ type: "AGENT_BLOCKED" });
+      expect(
+        (event as { reason: string }).reason,
+        `"${raw.error}" fell through to unknown — is it in BLOCK_REASONS?`,
+      ).not.toBe("unknown");
     }
   });
 });

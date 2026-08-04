@@ -50,7 +50,27 @@ const PLACEHOLDERS: Record<string, string> = {
   agent_id: "agent-0000",
 };
 
-function redact(value: unknown, key?: string): unknown {
+/**
+ * Fields whose value is kept only when it looks like an enum.
+ *
+ * `error` is the problem case, and it cost a milestone. On `StopFailure` it is
+ * the reason the agent is blocked — `authentication_failed`, `rate_limit` — and
+ * redacting it hid the one thing that payload exists to tell us: the first
+ * recorded `StopFailure` read `<redacted:string:21>`, which is how nobody
+ * noticed the mapping was reading a field that does not exist. On
+ * `PostToolUseFailure` the same key holds a tool's error message, which is
+ * prose and can contain absolute paths.
+ *
+ * So the test is on the value, not the key. A bare lower-snake_case identifier
+ * is not prose: no spaces, no slashes, no dots, no capitals. `rate_limit` is
+ * kept; `Error: /Users/hello/x failed` is not. Hook-name-specific rules were the
+ * alternative and would have needed the redactor to know the schema, which is
+ * the coupling this file exists without.
+ */
+const KEEP_IF_ENUMLIKE = new Set(["error", "subtype", "status", "kind", "level"]);
+const ENUMLIKE = /^[a-z][a-z0-9_]{0,39}$/;
+
+export function redact(value: unknown, key?: string): unknown {
   if (key && key in PLACEHOLDERS) return PLACEHOLDERS[key];
   if (Array.isArray(value)) return value.map((v) => redact(v));
   if (value && typeof value === "object") {
@@ -60,6 +80,7 @@ function redact(value: unknown, key?: string): unknown {
   }
   if (typeof value === "string") {
     if (key && KEEP_VALUES.has(key)) return value;
+    if (key && KEEP_IF_ENUMLIKE.has(key) && ENUMLIKE.test(value)) return value;
     // Keep the type and the length; drop the content.
     return `<redacted:string:${value.length}>`;
   }
