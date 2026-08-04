@@ -30,9 +30,17 @@ The platform surface is entirely in the Tauri shell: `protocol`, the adapters an
 
 Two halves: **the pet**, which is an app you run, and **the hooks**, which tell it what your agent is doing. Neither works without the other, and both fail silently, which is why there is a `doctor`.
 
-### 1 · Build and run the pet
+### 1 · Get the pet
 
-There is no signed release yet, so you build it. macOS, and you will need [Rust](https://rustup.rs) and Node 20+.
+**Download it** from [Releases](https://github.com/TrizenX/agent-pet/releases) — a universal `.dmg`, Apple Silicon and Intel. Drag it to Applications, then:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Agent Pet.app"
+```
+
+That step is not optional, and it is worth knowing why. The build is **unsigned**: signing and notarising need an Apple Developer identity this project does not have, so `spctl` reports `no usable signature` and macOS refuses to open a quarantined app that fails assessment. Removing the quarantine attribute is what lets it run. You should not do that for software you do not trust — every release ships a `.sha256` next to the `.dmg`, and the source is here.
+
+**Or build it**, which needs no such decision. macOS, [Rust](https://rustup.rs) and Node 20+:
 
 ```sh
 git clone https://github.com/TrizenX/agent-pet && cd agent-pet
@@ -41,7 +49,7 @@ pnpm --filter @agent-pet/pet-core tauri build --no-bundle
 ./packages/pet-core/src-tauri/target/release/agent-pet &
 ```
 
-A pet appears in the bottom-right corner, asleep. It lives in the tray from here — size, pack, click-through, language.
+Either way a pet appears, asleep. It lives in the menu bar from here — size, pack, click-through, language.
 
 > `cargo build --release` on its own is **not** enough: Tauri decides dev-versus-production from how `tauri-build` was invoked, not from the cargo profile, so that binary loads a dev server that is not running and shows an empty window.
 

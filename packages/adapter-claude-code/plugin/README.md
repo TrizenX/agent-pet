@@ -4,7 +4,21 @@
 contain the pet. On its own it does nothing at all — and it does nothing *silently*, which
 is why this is the first thing written here rather than a footnote.
 
-The pet is a desktop app you run. There is no signed release yet, so you build it once:
+The pet is a desktop app you run. Download it from
+[Releases](https://github.com/TrizenX/agent-pet/releases) — universal `.dmg`, Apple Silicon
+and Intel — drag it to Applications, and then:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Agent Pet.app"
+```
+
+The build is **unsigned**, because signing and notarising need an Apple Developer identity
+this project does not have. `spctl` reports `no usable signature`, and macOS will not open a
+quarantined app that fails assessment. Removing the quarantine attribute is what lets it
+run — do not do that for software you do not trust. Each release ships a `.sha256`.
+
+Or build it yourself, which asks you to trust nothing: [Rust](https://rustup.rs) and
+Node 20+, a few minutes the first time.
 
 ```sh
 git clone https://github.com/TrizenX/agent-pet && cd agent-pet
@@ -12,8 +26,6 @@ corepack enable && pnpm install
 pnpm --filter @agent-pet/pet-core tauri build --no-bundle
 ./packages/pet-core/src-tauri/target/release/agent-pet &
 ```
-
-You need [Rust](https://rustup.rs) and Node 20+. It takes a few minutes the first time.
 
 > `cargo build --release` on its own is **not** enough. Tauri decides dev-versus-production
 > from how `tauri-build` was invoked, not from the cargo profile, so that binary tries to
