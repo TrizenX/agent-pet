@@ -436,3 +436,88 @@ limit of the reading.
 A null result about a payload deserves the same suspicion as a null result about
 a test: the first question is whether the instrument was pointed at the right
 thing.
+
+---
+
+# TZX-97: the pet was invisible because the page was too transparent
+
+The window was never the problem. I spent a day proving things about it.
+
+## What it was
+
+A fully transparent page makes WKWebView composite **none of the layer**. Not
+"the transparent parts" — none of it. The opaque sprite and the dark speech
+bubble were dropped along with the empty space.
+
+Measured by capturing the window by id, which is the only capture that ignores
+which Space is active:
+
+| `.pet-root` background | alpha extrema | what appears |
+| :-- | :-- | :-- |
+| `transparent` | `(0, 0)` | nothing, not one painted pixel |
+| `rgba(0,0,0,0.01)` | `(3, 255)` | the pet and the bubble |
+
+`#ff0000` was the experiment that found it. A solid red root rendered the
+penguin and "Nghỉ tí…" perfectly — which is what finally ruled out the window,
+the Space, the level, the NSPanel conversion, and everything else.
+
+The fix is one declaration: `rgba(0, 0, 0, 0.01)`, alpha 3/255, about 1 % black
+over a 420x430 rectangle. Below the threshold of noticing, and the smallest
+value that survives rounding.
+
+## The symptom I mistook for the cause
+
+`kCGWindowIsOnscreen` was absent, and the window was in the onscreen list only
+0–12 % of the time. I treated that as the bug and tested six hypotheses against
+it: the saved position, the walk, the NSPanel re-class, the window level,
+applying the collection behaviour before `show()`, and activating the app. All
+six refuted.
+
+After the fix, the same measurement reads **100 %**. The window server does not
+count a window whose layer has nothing composited in it. *Not onscreen* was
+downstream of *nothing painted* the entire time, and I had the arrow backwards
+for a day.
+
+## Three instruments, three artefacts
+
+Every measurement I took from outside the process was wrong in its own way, and
+each one produced a confident false conclusion before it was caught.
+
+**`screencapture` only sees the active Space.** So a full-screen capture of a
+window on another Space looks exactly like a window that draws nothing.
+
+**A differential screenshot needs a static background.** Diffing against a live
+terminal measured the terminal: the control rectangle changed *more* than the
+pet's, 11.7 % against 7.1 %, which is the control correctly announcing that the
+measurement was meaningless. `fullscreen.py` works only because TextEdit holds
+still.
+
+**Reading the window rect then screenshotting races the walk**, which moves the
+window every 900 ms — so the crop can land where the window used to be.
+
+And the AppKit reads I added to replace them had an artefact too: `occlusion`
+returned `0x2000` for our window *and* for both `NSStatusBarWindow`s, which are
+plainly working. `isOnActiveSpace` was `false` for those as well. Enumerating
+every window the app owns was what exposed it — two known-good windows in the
+same process, read the same way, giving the same meaningless answer. That
+control should have existed before any of those readings was believed.
+
+## The test, which first could not fail
+
+The guard is a stylesheet assertion, because jsdom composites nothing. Its first
+version matched the *comment* explaining the rule — the comment contains
+`background: rgba(0,0,0,0.01)` as example text — so it passed with the real
+declaration deleted. A test satisfied by its own documentation is worse than no
+test. It now strips comments before matching, and fails both ways: declaration
+removed, and alpha raised to something a user would see.
+
+## What this cost, and what it is worth
+
+Six refuted hypotheses, two claims built on two coincidences each, one macOS
+change committed and reverted, and a build measured against a binary that had no
+frontend in it because `cargo build --release` loads `devUrl` — a trap this
+repository already warns about in a comment.
+
+The finding underneath all of it: **a null result about a payload or a pixel
+deserves the same suspicion as a null result about a test.** The first question
+is never "why is it broken", it is "is the instrument pointed at the thing".
