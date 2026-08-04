@@ -1,0 +1,12 @@
+{
+  "session_id": "session-0000",
+  "transcript_path": "/home/user/.agent/transcript.jsonl",
+  "cwd": "/home/user/demo-project",
+  "prompt_id": "prompt-0000",
+  "effort": {
+    "level": "<redacted:string:4>"
+  },
+  "hook_event_name": "StopFailure",
+  "error": "<redacted:string:21>",
+  "last_assistant_message": "<redacted:string:33>"
+}

@@ -132,9 +132,15 @@ Two variants were run against a real headless session:
 | endpoint returns | what happened | hooks fired |
 | :-- | :-- | :-- |
 | `429 rate_limit_error` | the client retried with backoff for over ten minutes | `UserPromptSubmit`, `SessionEnd` |
-| `401 authentication_error` | failed immediately | `UserPromptSubmit`, `SessionEnd` |
+| `401 authentication_error` | *recorded here as "failed immediately"* | `UserPromptSubmit`, `SessionEnd` |
 
 **No `StopFailure` in either case.** The turn failed and the session simply ended.
+
+> **Corrected below.** "Failed immediately" was wrong, and it mattered: a `401`
+> is retried ten times at sixty-second intervals, exactly like the `429`. Both
+> runs were abandoned inside the backoff window, so neither had reached a
+> terminal failure when it was called a result. See
+> [why every previous attempt saw nothing](#stopfailure-why-every-previous-attempt-saw-nothing).
 
 That completes a pattern rather than adding an isolated fact. Four hooks have
 never appeared in any headless run — `SessionStart`, `PermissionRequest`,
@@ -162,3 +168,197 @@ node packages/adapter-claude-code/src/cli.ts uninstall --port 48201
 
 Both hook sets coexist: `isOurs` matches on the URL, so installing a second port
 adds to the first rather than replacing it.
+
+---
+
+# Interactive sessions, driven for real
+
+Everything above was measured headless. Four hooks had never been seen, and the
+conclusion recorded was "these need a human at a keyboard". That was true and it
+was also an excuse: a keyboard can be simulated. `claude` under a pty is a real
+interactive session — same binary, same UI, same code path — and it can be
+driven from a script.
+
+Fifteen sessions were run this way against a recorder on a second port.
+
+## Two confounds, both of which would have produced a wrong answer
+
+**The child-session marker.** The first pty run printed `⚠ Transcript saving is
+off — inherited CLAUDE_CODE_CHILD_SESSION marker`. A session spawned from
+inside another Claude Code session inherits `CLAUDECODE`,
+`CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_CHILD_SESSION` and friends, and is
+treated as a child rather than a new session. Measuring session *lifecycle*
+hooks in a session the tool does not consider new is measuring nothing. Every
+run below unsets all seven.
+
+**Bracketed paste eats the Enter.** Two prompts appeared to be ignored — typed
+into the input box, never submitted, no response for ninety seconds. They were
+the two long enough to wrap onto a second line. Bracketed paste is on, so a
+newline arriving in the same write as the text is inserted as a line break
+instead of submitting. The text and the Enter have to be separate writes.
+
+Both looked exactly like "the model did not do what I asked", which is the most
+expensive kind of wrong: a plausible reading that ends the investigation.
+
+## `SessionStart` is registered and never fires
+
+Fifteen sessions. **Fifteen `SessionEnd`. Zero `SessionStart`.**
+
+Not a subscription problem — it is in `hookConfig()` and it was live in
+`settings.json` throughout, alongside `SessionEnd`, which arrived every time:
+
+    Elicitation, ElicitationResult, Notification, PermissionDenied,
+    PermissionRequest, PostCompact, PostToolUse, PostToolUseFailure, PreCompact,
+    PreToolUse, SessionEnd, SessionStart, Stop, StopFailure, SubagentStart,
+    SubagentStop, UserPromptSubmit
+
+A hook we ask for, that its own sibling proves is wired correctly, that does not
+exist. Claude Code 2.1.220.
+
+The pet does not depend on it — a session registers on whatever arrives first,
+usually `UserPromptSubmit` — so this costs nothing today. It is in the mapping
+as an entry that can never execute.
+
+## `PermissionDenied` never fires either, and that one costs something
+
+Two independent denial paths, both silent.
+
+**A human declining the dialog.** Esc at a Write permission prompt. The
+rejection was real — `User rejected write to …`, and no file was created.
+
+**A policy denial.** A project with `permissions.deny: ["Bash(curl:*)"]`. The
+command was blocked and the model was told to use WebFetch instead.
+
+Neither produced `PermissionDenied`. Across the whole run: 42 `PermissionRequest`
+and not one `PermissionDenied`.
+
+### What actually reaches the pet when you say no
+
+Isolated to a throwaway project so the operator's own session could not pollute
+it — the raw logger filtered on `cwd`:
+
+    18:14:20  UserPromptSubmit
+    18:14:24  PreToolUse         Bash
+    18:14:24  PermissionRequest  Bash
+    18:15:07  SessionEnd
+
+Forty-three seconds between the tool starting and the session ending, and
+**nothing in between**. No `PermissionDenied`. No `PostToolUse` — the tool never
+ran, so nothing completed. No `Stop` — measured with a forty-second settle after
+the decline, specifically to rule out a late arrival.
+
+`PreToolUse` had already sent the pet to `working`. Nothing terminates it.
+
+Note what is also absent: no `Notification` with `permission_prompt`. That is
+the event that maps to `APPROVAL_NEEDED`, and it is how the pet is supposed to
+know a human is being asked something. In this probe the dialog was on screen
+and it did not arrive — so the pet was not even showing "May I?", it was
+claiming to be busy. `Notification` did fire thirteen times elsewhere in the
+run, from the operator's own concurrent session, so this is an observation
+about this dialog rather than a claim that the hook is dead. It is the next
+thing to isolate.
+
+The machine's only way out is `WATCHDOG`, at `300_000` ms. So after the user
+declines, **the pet spends five minutes insisting the agent is busy** — naming
+the very tool that was refused — and then goes to `sleeping`, not `idle`,
+because the watchdog treats silence as absence. The user is sitting right there,
+having just pressed Esc.
+
+This is the same failure the approval path already had and was fixed for:
+
+> Granting permission produces no event of its own. A denial arrives as
+> `APPROVAL_RESOLVED`; an approval arrives as nothing at all.
+> — `petMachine.ts`, on the root `TOOL_DONE` transition
+
+The first sentence is right. The second is now measured to be wrong: **a denial
+also arrives as nothing at all.** The comment describes a hook that does not
+fire, and the fix built on it covers only half the case it was written for.
+
+Worth being precise about what is broken. The mapping is not wrong — if
+`PermissionDenied` ever arrives it is handled correctly. What is wrong is that
+the pet has no signal for "the tool is not going to happen", and it currently
+gets that signal only by timing out.
+
+## `StopFailure`: why every previous attempt saw nothing
+
+The earlier headless runs reported "the client retried with backoff for over ten
+minutes" and were stopped there. Driving it interactively put a number on it:
+
+    ✻ API error · Retrying in 1m 0s · attempt 1/10
+
+**Ten attempts, sixty seconds apart.** Every attempt against the local endpoint
+was logged, so this is counted rather than inferred — ten `401`s served to one
+prompt. A turn does not fail for roughly ten minutes, and `--mode auth`, chosen
+precisely because a `401` is not a retryable condition in any useful sense, is
+retried exactly like a `429`.
+
+That is the whole explanation for the earlier null results. Every attempt so far
+had been abandoned inside the backoff window, and "no `StopFailure`" meant "no
+verdict yet" — a null reported as a finding.
+
+Left to run past the tenth retry, it fired.
+
+    [record] StopFailure #1 -> test/fixtures/StopFailure-1.json
+
+**`exhausted` has an input.** The state §7.1 calls the highest-value in the
+product, unreached since M0, now has a payload recorded from a real client
+against a real failure. It needed no quota and no account — only the patience
+to sit through ten minutes of backoff that every previous attempt had walked
+away from.
+
+### And the payload does not have the field the mapping reads
+
+```json
+{
+  "hook_event_name": "StopFailure",
+  "session_id": "…", "cwd": "…", "prompt_id": "…",
+  "effort": { "level": "…" },
+  "error": "<redacted:string:21>",
+  "last_assistant_message": "<redacted:string:33>"
+}
+```
+
+No `error_type`. The mapping does this:
+
+```ts
+const key = typeof raw.error_type === "string" ? raw.error_type : "unknown";
+return [{ type: "AGENT_BLOCKED", reason: BLOCK_REASONS[key] ?? "unknown" }];
+```
+
+So every genuine block resolves to `unknown`, and `BLOCK_REASONS` — eight
+entries mapping `rate_limit`, `overloaded`, `billing_error`,
+`authentication_failed` and the rest onto the reason the pet reports — is
+unreachable. It was written from documentation at M0, has only ever been
+exercised by payloads we wrote ourselves, and has been wrong the entire time.
+
+This is precisely the thing §11.1 says recording exists to catch, and it took
+the first real payload to catch it. One fixture, one dead table.
+
+Pinned as a test rather than fixed on the spot. The real payload carries `error`
+as free text, and what that string actually contains is being captured
+separately — guessing a parse from one redacted sample is how the `error_type`
+table got here in the first place.
+
+## Elicitation, deliberately not attempted
+
+Both need an MCP server that asks for input mid-turn, and none of the servers
+already configured here does. Standing one up would produce a fixture from a toy
+built to trigger the hook, which is the thing recording exists to avoid.
+
+## What this changes
+
+Two of the five hooks the mapping registers for appear not to exist in Claude
+Code 2.1.220. The third, `StopFailure`, does exist and was simply never waited
+for. Two things follow.
+
+**The pet has no signal for "this tool is not going to happen."** It is not
+missing a hook; the hook it was written against does not fire. The five-minute
+watchdog is currently the entire recovery path, and it recovers to `sleeping`.
+Fixing it needs a decision, not a patch, because the only agent-agnostic signal
+available is time, and a long build is indistinguishable from a refused command
+by duration alone. Recorded here rather than guessed at.
+
+**`exhausted` is reachable, and it cannot say why.** The state has its first
+real input, and the same payload shows the reason table feeding it has never
+been able to match. Fixing that needs to know what `error` contains, which is
+one more capture rather than one more guess.
