@@ -20,7 +20,7 @@ A desktop pet that is the embodiment of a running AI coding agent. It digs while
 | | |
 | :-- | :-- |
 | **macOS**, **Windows** | Phase 1 targets. |
-| **Linux · X11** | Best-effort, and now measured: the pet places itself, floats above other windows, passes clicks through, and gets a 32-bit ARGB visual (you need a compositing manager running for that last one to show). Checked on Xvfb + openbox, not on GNOME or KDE. |
+| **Linux · X11** | Best-effort, and measured: the pet places itself, floats above other windows, passes clicks through, and gets a 32-bit ARGB visual. **You need a compositing manager** — picom, xcompmgr, or any composited desktop. Without one, 93 % of the window renders flat black and the pet is a box on your screen rather than an overlay; the app says so at startup. Checked on Xvfb + openbox, not on GNOME or KDE. |
 | **Linux · Wayland** | Unsupported, and the app tells you so at startup. Wayland gives a client no way to position its own window or force always-on-top, so the pet would sit in the top-left corner behind whatever you are working in. Log in to an X11 session instead. [Why](artifacts/spike-e/FINDINGS.md). |
 | **iOS / Android** | Out of scope, and not for the obvious reason: the agent runs on your desktop, so a phone cannot receive its hooks at all. The honest mobile shape is a remote notifier over the Phase 3 protocol, not an overlay pet. |
 
