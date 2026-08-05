@@ -21,7 +21,10 @@ pub fn apply_overlay_behaviour(window: &WebviewWindow) {
         // set, and `set_position` and `set_ignore_cursor_events` both work.
         let _ = window;
         #[cfg(target_os = "linux")]
-        warn_if_wayland();
+        {
+            warn_if_wayland();
+            warn_if_not_composited();
+        }
     }
 }
 
@@ -50,6 +53,43 @@ fn warn_if_wayland() {
          or stay above other windows — it will sit at the top-left, behind \
          whatever you are working in. Log in with an X11 session for the \
          overlay to work. See artifacts/spike-e/FINDINGS.md."
+    );
+}
+
+/// Say so when X11 has no compositing manager, because the pet becomes a box.
+///
+/// The window is transparent and gets a 32-bit ARGB visual, which Spike E
+/// confirmed. What Spike E did not check is what happens when nothing is there
+/// to composite it: X11 draws the unpainted area opaque, and the pet becomes a
+/// solid 420x430 rectangle sitting on top of whatever you are working in.
+///
+/// Measured under Xvfb with openbox and no compositor: **93 % of the window is
+/// flat black**, with the sprite and the bubble drawn on it. That is not a
+/// degraded overlay, it is a black box, and §1.1's "a pet you cannot see is worse
+/// than no pet" has an obvious sibling here.
+///
+/// GTK already answers this — `gdk_screen_is_composited` wraps the
+/// `_NET_WM_CM_S0` selection owner check — and gdk is already in the tree via
+/// tauri's Linux backend, so this costs nothing to ask.
+///
+/// A warning rather than a refusal: picom, xcompmgr and every desktop compositor
+/// fix it, and the user may well have one. Telling them what to install is more
+/// use than declining to start.
+#[cfg(target_os = "linux")]
+fn warn_if_not_composited() {
+    use gdk::prelude::*;
+    let Some(screen) = gdk::Screen::default() else {
+        return;
+    };
+    if screen.is_composited() {
+        return;
+    }
+    eprintln!(
+        "[window] no compositing manager is running, so this X11 session cannot \
+         draw a transparent window — the pet will appear as a solid black \
+         rectangle rather than floating over your desktop. Start one (picom, \
+         xcompmgr) or use a desktop environment that composites. Measured: 93 % \
+         of the window is opaque without one."
     );
 }
 

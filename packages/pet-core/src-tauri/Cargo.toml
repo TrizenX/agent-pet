@@ -28,6 +28,12 @@ tauri-plugin-clipboard-manager = "2.3.2"
 objc = "0.2"
 block = "0.1"
 
+# Already in the tree via tauri's Linux backend; declared directly so the
+# compositor check can call `gdk_screen_is_composited`. Version pinned to what
+# webkit2gtk already resolves, so this adds nothing to the build.
+[target.'cfg(target_os = "linux")'.dependencies]
+gdk = "0.18"
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

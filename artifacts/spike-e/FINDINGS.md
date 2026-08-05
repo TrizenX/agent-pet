@@ -195,3 +195,81 @@ for `0,0` and `outer_position()` returns `0,0`, so the log says `[window] at
 Linux placement bug obvious in one line cannot see the Wayland one at all,
 because both sides of the comparison are wrong in the same way.
 
+
+---
+
+# X11, measured a second time: what "works" left out
+
+Spike E answered *can it*. This asks *is it usable*, which turned out to be a
+different question with a worse answer.
+
+## Without a compositing manager the pet is a black box
+
+The window gets a 32-bit ARGB visual — that part of Spike E holds. What Spike E
+never checked is what happens when nothing is there to composite it.
+
+Measured under Xvfb with openbox and no compositor, cropping the window's exact
+rectangle out of a screenshot with a red root behind it:
+
+| | no compositor | with `xcompmgr` |
+| :-- | :-- | :-- |
+| flat black | **93.0 %** | 2.0 % |
+| pet content | 7.0 % | 98.0 % |
+| red desktop showing through | 0.0 % | 0.0 % |
+
+The screenshot is unambiguous: the sprite and the speech bubble render correctly,
+in the right places, on a **solid black 420x430 rectangle**. On a real desktop
+that is a black box sitting on top of whatever you are working in. Not a degraded
+overlay — the opposite of one.
+
+§1.1 says a pet you cannot see is worse than no pet. A pet you cannot see *past*
+belongs in the same sentence.
+
+## The `xcompmgr` column above is not evidence
+
+Both compositor rows say 0.0 % red, which cannot be right: if transparency were
+working, the red root would show through. It does not, because a compositing
+manager redirects rendering and `import -window root` stops returning what is on
+screen — the identical artefact that wasted a day on macOS during TZX-97, where
+the same capture produced a uniform `RGB(128,128,128)`.
+
+So: **no-compositor is measured, with-compositor is not.** The 98 % "content"
+figure is the capture failing, not the pet succeeding. Whether transparency
+actually composites on a real X11 desktop is still unphotographed, and the honest
+way to get it is the window-id capture that finally worked on macOS — X11's
+equivalent needs a compositor-aware grab, which `import -window root` is not.
+
+## Fonts are fine, which was worth checking
+
+The CSS stack is `ui-monospace, SFMono-Regular, Menlo, monospace` — three macOS
+names and a fallback. A minimal Debian container with the webkit2gtk runtime
+already carries 111 fonts and resolves `monospace` to DejaVu Sans Mono, and the
+bubble renders legibly at 12px. Installing `fonts-dejavu-core` explicitly changed
+nothing. No work needed.
+
+## Idle CPU: measured, and not attributable
+
+Two seconds of CPU over forty, so roughly 5 % of one core, against **0.083 %**
+measured on macOS in Spike C. RSS 151 MB against ~350 MB on macOS.
+
+That looks alarming and should not be quoted. Xvfb has no GPU: WebKit falls back
+to software rendering, and the pet animates. The number describes llvmpipe, not
+Linux. I6 remains unmeasured on Linux until someone runs it on a real X11 session
+with hardware acceleration.
+
+## What was done about it
+
+`warn_if_not_composited`, beside the Wayland warning. GTK already answers the
+question — `gdk_screen_is_composited` wraps the `_NET_WM_CM_S0` selection owner
+check — and gdk is already in the dependency tree via tauri's Linux backend, so
+asking costs nothing.
+
+A warning, not a refusal: picom and xcompmgr both fix it, every composited desktop
+already has one, and telling someone what to install is more use than declining to
+start.
+
+Verified on Linux in both directions, which is the only way a conditional warning
+is worth anything:
+
+    no compositor    -> warned once
+    with xcompmgr    -> warned 0 times
