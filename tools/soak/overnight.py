@@ -110,7 +110,7 @@ def onscreen() -> bool:
     )
 
 
-def visibility(keep_dir: Path, stamp: str) -> dict:
+def visibility(keep_dir: Path, stamp: str, keep: bool = True) -> dict:
     """Capture the window by id and describe what is painted in it."""
     wid = window_id()
     if wid is None:
@@ -131,18 +131,20 @@ def visibility(keep_dir: Path, stamp: str) -> dict:
         content = sum(1 for p in a.get_flattened_data() if p > BACKDROP) / (im.width * im.height)
         painting = hi >= 200 and content >= 0.02
         if not painting:
-            # The whole point of the run. Keep it — a frame from the moment it
-            # was wrong is worth more than any amount of reasoning afterwards.
-            kept = keep_dir / f"invisible-{stamp}.png"
-            tmp.replace(kept)
-            return {
+            row = {
                 "window": True,
                 "painting": False,
                 "alpha_lo": lo,
                 "alpha_hi": hi,
                 "content": round(content, 5),
-                "evidence": str(kept),
             }
+            if keep:
+                # The whole point of the run. Keep it — a frame from the moment it
+                # was wrong is worth more than any amount of reasoning afterwards.
+                kept = keep_dir / f"invisible-{stamp}.png"
+                tmp.replace(kept)
+                row["evidence"] = str(kept)
+            return row
         return {
             "window": True,
             "painting": True,
@@ -319,7 +321,9 @@ def main() -> int:
         paint_started = time.time()
         first_paint = None
         while time.time() - paint_started < args.warmup:
-            v = visibility(out, "warmup")
+            # keep=False: a frame that has not painted *yet* is the expected
+            # answer here, not evidence of anything.
+            v = visibility(out, "warmup", keep=False)
             if v.get("painting"):
                 first_paint = time.time() - paint_started
                 break
